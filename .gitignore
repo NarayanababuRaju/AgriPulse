@@ -8,6 +8,7 @@ Thumbs.db
 *.secret
 google-services.json
 GoogleService-Info.plist
+backend/config/*.json
 
 # Python
 __pycache__/
@@ -90,6 +91,15 @@ yarn-error.log*
 # Build systems
 .ninja_log
 .dart_tool/
+
+# Data files (training images, too large for git)
+data/raw/
+data/processed/
+*.jpg
+*.jpeg
+*.png
+!docs/assets/*.png
+!mobile/assets/*.png
 
 # Other
 .env*

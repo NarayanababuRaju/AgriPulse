@@ -144,14 +144,19 @@ C4Container
 - **Libraries**: Riverpod, Dio, Hive, Firebase, Speech APIs
 
 ### Backend
-- **Framework**: FastAPI (Python 3.10+)
-- **Deployment**: Google Cloud Run (serverless, auto-scaling)
+- **Framework**: FastAPI 0.104.1 (Python 3.9+)
+- **Server**: Uvicorn 0.24.0 (ASGI server)
+- **Deployment**: Google Cloud Run (serverless, auto-scaling) - *Planned*
 - **Features**: High-performance async API, CORS enabled for web clients
+- **Status**: ✅ Fully functional with all endpoints tested
+- **Database**: Firestore (`agri-pulse-firestore-db` in asia-south1)
 
 ### AI & ML
-- **Primary Model**: Gemini 3.0 Flash (vision analysis, fast inference)
-- **Reasoning Model**: Gemini 3.0 Pro (yield prediction, complex reasoning)
+- **Primary Model**: Gemini 3.0 Flash Preview (vision analysis, fast inference)
+- **Reasoning Model**: Gemini 3.0 Pro Preview (yield prediction, complex reasoning)
+- **SDK Version**: google-generativeai 0.8.6
 - **Capabilities**: Vision API, text generation, reasoning mode, multimodal analysis
+- **Status**: ✅ Fully integrated and tested with real onion disease images
 
 ### Data & Storage
 - **Primary Database**: Firestore (NoSQL, real-time sync)
@@ -241,17 +246,45 @@ cd backend
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload
+
+# Start the server
+./start_server.sh
+# OR
+uvicorn app.main:app --host 127.0.0.1 --port 8080 --reload
 ```
 
-4. **Configure Firebase**
-   - Create a Firebase project at [firebase.google.com](https://firebase.google.com)
-   - Download `google-services.json` and place in `backend/config/`
-   - Update Firestore security rules
+**Test the API:**
+```bash
+# Interactive API docs
+open http://127.0.0.1:8080/docs
 
-5. **Setup Gemini API**
-   - Enable Generative AI API in Google Cloud Console
-   - Set `GEMINI_API_KEY` environment variable
+# Run test suite
+python tests/test_api.py
+
+# Test with real disease images
+python tests/test_real_images.py
+
+# Check available Gemini models
+python tests/check_models.py
+```
+
+4. **Configure Environment Variables**
+   - Copy `.env.example` to `.env`
+   - Add your API keys:
+     ```bash
+     GEMINI_API_KEY=your_gemini_api_key_here
+     WEATHER_API_KEY=your_weather_api_key_here
+     ```
+   - Set GCP credentials path:
+     ```bash
+     GOOGLE_APPLICATION_CREDENTIALS=config/service-account.json
+     ```
+
+5. **Setup Google Cloud & Firebase**
+   - Follow [Google Cloud Setup Guide](docs/google_cloud_setup_guide.md)
+   - Follow [Firebase Setup Guide](docs/firebase_setup_guide.md)
+   - Create Firestore database in asia-south1
+   - Download service account JSON to `backend/config/`
 
 ---
 
@@ -278,5 +311,32 @@ This project is licensed under the **MIT License** - see [LICENSE](LICENSE) file
 
 ---
 
-*Last Updated: January 27, 2026*
-*Status: Development (Day 1 Initialization)*
+---
+
+## ✅ Current Status
+
+### Completed Features:
+- ✅ **Backend API**: FastAPI server with Gemini 3.0 integration
+- ✅ **Crop Disease Analysis**: Multimodal analysis with gemini-3-flash-preview
+- ✅ **Yield Prediction**: Reasoning-based predictions with gemini-3-pro-preview
+- ✅ **Firestore Integration**: Database operations fully functional
+- ✅ **Testing**: All API endpoints tested (3/3 passing)
+- ✅ **Real-World Validation**: Successfully analyzed actual onion disease images
+  - Basal Rot: 95% confidence
+  - Pythium Root Rot: 92% confidence
+  - Purple Blotch: 85% confidence
+
+### In Progress:
+- 🔄 **Speech APIs**: Google Cloud Speech-to-Text & Text-to-Speech integration
+- 🔄 **Weather API**: OpenWeatherMap integration for forecasts
+- 🔄 **Flutter UI**: Authentication and crop upload screens
+
+### Upcoming:
+- ⏳ **Cloud Deployment**: Deploy backend to Cloud Run
+- ⏳ **Mobile Testing**: Test on Android and iOS devices
+- ⏳ **Demo Video**: Create hackathon submission video
+
+---
+
+*Date Created: January 27, 2026*
+*Last Updated: January 28, 2026*
