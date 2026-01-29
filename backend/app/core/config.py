@@ -1,11 +1,14 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+from typing import Optional
 
 
 class Settings(BaseSettings):
     # API Keys
     gemini_api_key: str
-    weather_api_key: str
+    weather_api_key: Optional[str] = None
+    openweather_api_key: Optional[str] = None
+    google_maps_weather_api_key: Optional[str] = None
     
     # GCP Configuration
     gcp_project_id: str
