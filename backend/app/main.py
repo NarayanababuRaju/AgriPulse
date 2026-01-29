@@ -23,11 +23,13 @@ app.add_middleware(
 )
 
 # Import routers
-from app.api import crop, feedback
+from app.api import crop, feedback, weather, speech
 
 # Include routers
 app.include_router(crop.router)
 app.include_router(feedback.router)
+app.include_router(weather.router)
+app.include_router(speech.router)
 
 @app.on_event("startup")
 async def startup_event():
