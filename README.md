@@ -317,6 +317,9 @@ This project is licensed under the **MIT License** - see [LICENSE](LICENSE) file
 
 ### Completed Features:
 - ✅ **Backend API**: FastAPI server with Gemini 3.0 integration
+- ✅ **Intelligence Bridge**:
+    - **Speech APIs**: Google Cloud STT/TTS (6 Languages)
+    - **Weather Context**: Real-time injection via OpenWeatherMap
 - ✅ **Crop Disease Analysis**: Multimodal analysis with gemini-3-flash-preview
 - ✅ **Yield Prediction**: Reasoning-based predictions with gemini-3-pro-preview
 - ✅ **Firestore Integration**: Database operations fully functional
@@ -327,8 +330,6 @@ This project is licensed under the **MIT License** - see [LICENSE](LICENSE) file
   - Purple Blotch: 85% confidence
 
 ### In Progress:
-- 🔄 **Speech APIs**: Google Cloud Speech-to-Text & Text-to-Speech integration
-- 🔄 **Weather API**: OpenWeatherMap integration for forecasts
 - 🔄 **Flutter UI**: Authentication and crop upload screens
 
 ### Upcoming:
@@ -339,4 +340,6 @@ This project is licensed under the **MIT License** - see [LICENSE](LICENSE) file
 ---
 
 *Date Created: January 27, 2026*
-*Last Updated: January 28, 2026*
+*Last Updated: January 30, 2026*
+
+---
