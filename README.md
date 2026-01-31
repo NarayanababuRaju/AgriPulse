@@ -3,8 +3,8 @@
 **AI-Powered Agricultural Advisory Platform for Sustainable Farming**
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Status](https://img.shields.io/badge/status-Development-orange.svg)](https://github.com/NarayanababuRaju/AgriPulse)
-[![Hackathon](https://img.shields.io/badge/hackathon-Google%20DeepMind%20Gemini%203-brightgreen.svg)](https://www.googlecloud.com/blog/gemini-hackathon)
+[![Status](https://img.shields.io/badge/status-Milestone--v3--Stable-brightgreen.svg)](https://github.com/NarayanababuRaju/AgriPulse)
+[![Hackathon](https://img.shields.io/badge/hackathon-Google%20DeepMind%20Gemini%203-brightgreen.svg)](https://gemini3.devpost.com/)
 
 ---
 
@@ -43,7 +43,6 @@ Discover applicable government subsidies, loan schemes, and support programs spe
 
 ## 🏗️ System Architecture
 
-### High-Resolution C4 Component Diagram
 
 ```mermaid
 C4Container
@@ -136,22 +135,50 @@ C4Container
 
 ---
 
+## 📁 Project Structure
+
+AgriPulse follows a modular, feature-first architecture to ensure scalability across platforms.
+
+```text
+AgriPulse/
+├── backend/            # Python FastAPI backend
+│   ├── app/            # Core API, services, and models
+│   └── tests/          # Pytest suite for end-to-end verification
+├── flutter_app/        # Flutter Web/Mobile frontend
+│   ├── lib/
+│   │   ├── core/       # Shared themes, routing, and networking
+│   │   └── features/   # Business modules (Auth, Diagnosis, Dashboard)
+│   └── test/           # Unit, widget, and integration tests
+└── docs/               # Technical documentation & milestones
+```
+
+---
+
+---
+
 ## 🛠️ Technology Stack
 
 ### Frontend
 - **Framework**: Flutter Web (Dart)
 - **Features**: Responsive design, offline-first, real-time updates
 - **Libraries**: Riverpod, Dio, Hive, Firebase, Speech APIs
+    - **State Management**: Riverpod (Reactive provider engine)
+- **Networking**: `dio` (Centralized API Client)
+- **Audio**: `just_audio` (Web Data-URI bridge for binary streams)
+- **Visuals**: `google_fonts` (Outfit/Inter), `flutter_animate`, `shimmer`
 
 ### Backend
-- **Framework**: FastAPI 0.104.1 (Python 3.9+)
-- **Server**: Uvicorn 0.24.0 (ASGI server)
+- **Framework**: FastAPI 0.104.1 (Async orchestration)
+- **Server**: Uvicorn (ASGI server)
 - **Deployment**: Google Cloud Run (serverless, auto-scaling) - *Planned*
 - **Features**: High-performance async API, CORS enabled for web clients
-- **Status**: ✅ Fully functional with all endpoints tested
-- **Database**: Firestore (`agri-pulse-firestore-db` in asia-south1)
+- **Database**: Firestore (`agri-pulse-firestore-db`, asia-south1)
+- **Cloud Service**: Google Cloud Run (Auto-scaling serverless)
 
-### AI & ML
+### AI & Intelligence
+- **Multimodal AI**: Gemini 3.0 Flash & Pro (Vision + Reasoning)
+- **Speech**: Google Cloud STT & TTS (6 vernacular Indian languages)
+- **Context**: OpenWeatherMap (Real-time data injection)
 - **Primary Model**: Gemini 3.0 Flash Preview (vision analysis, fast inference)
 - **Reasoning Model**: Gemini 3.0 Pro Preview (yield prediction, complex reasoning)
 - **SDK Version**: google-generativeai 0.8.6
@@ -170,19 +197,27 @@ C4Container
 - **Market Data**: AGMARKNET API (Phase 2, currently mocked)
 
 ### Infrastructure
-- **Containerization**: Docker (FastAPI backend)
+- **Containerization**: Docker (Multi-stage builds)
 - **Cloud Provider**: Google Cloud Platform (Cloud Run, Firestore, Cloud Storage)
-- **CI/CD**: GitHub Actions (automated testing and deployment)
+- **Security**: Firebase Auth (Phone/OTP flow)
+- **Version Control**: Git / GitHub Actions
 
 ---
 
-## 📂 Documentation
+## 📂 Documentation Iceberg
 
-For detailed technical information, please refer to the [docs](docs/) folder:
-- **[System Architecture](docs/SYSTEM_ARCHITECTURE_C4.md)** - Detailed C4 component diagram and architecture explanation
-- **[Features & Requirements](docs/FEATURES_AND_REQUIREMENTS.md)** - Complete feature specifications with acceptance criteria
-- **[Gemini Integration](docs/GEMINI_INTEGRATION_WRITEUP.md)** - How Gemini 3.0 is integrated into AgriPulse
-- **[Gemini API Knowledge Graph](docs/GEMINI_API_KNOWLEDGE_GRAPH.md)** - Complete Gemini API reference
+Navigate through the technical specifics of AgriPulse using the links below.
+
+### 🏛️ Architecture & Core Design
+- [**System Architecture (C4)**](docs/SYSTEM_ARCHITECTURE_C4.md) - Deep dive into component interaction.
+- [**Features & Requirements**](docs/FEATURES_AND_REQUIREMENTS.md) - The complete product roadmap.
+- [**Gemini Integration**](docs/GEMINI_INTEGRATION_WRITEUP.md) - How we utilize multimodal reasoning.
+
+### 🏁 Milestone Reports
+- [**Milestone v1**](docs/milestones/v1_agripulse_locked.md) - Initialization & Foundation.
+- [**Milestone v2**](docs/milestones/v2_agripulse_backend_complete.md) - Intelligence & Backend.
+- [**Milestone v3**](docs/milestones/v3_basic_feature_working.md) - Full-stack Integration & Stability.
+
 
 ---
 
@@ -323,23 +358,30 @@ This project is licensed under the **MIT License** - see [LICENSE](LICENSE) file
 - ✅ **Crop Disease Analysis**: Multimodal analysis with gemini-3-flash-preview
 - ✅ **Yield Prediction**: Reasoning-based predictions with gemini-3-pro-preview
 - ✅ **Firestore Integration**: Database operations fully functional
-- ✅ **Testing**: All API endpoints tested (3/3 passing)
+- ✅ **Flutter Web Frontend**: 
+    - **Auth**: Secure Phone/OTP flow with Firebase
+    - **Dashboard**: Weather-aware command center with glassmorphic UI
+    - **Crop Doctor**: Integrated Multimodal diagnosis & TTS playback
+    - ✅ **Testing**: All API endpoints tested (3/3 passing)
 - ✅ **Real-World Validation**: Successfully analyzed actual onion disease images
   - Basal Rot: 95% confidence
   - Pythium Root Rot: 92% confidence
   - Purple Blotch: 85% confidence
+- ✅ **Milestone v3**: "Working System" fully verified and integrated
+- ✅ **Testing**: Unit & Integration tests for Backend (FastAPI) and Frontend (Riverpod)
 
-### In Progress:
-- 🔄 **Flutter UI**: Authentication and crop upload screens
+### In Progress (Phase 2):
+- 🔄 **Cloud Deployment**: Deploying backend services to Google Cloud Run
+- 🔄 **Yield Estimation UI**: Interactive inputs for Phase 2 reasoning
+- 🔄 **Cost-Benefit Calculator**: Financial modeling for farmers
 
 ### Upcoming:
-- ⏳ **Cloud Deployment**: Deploy backend to Cloud Run
-- ⏳ **Mobile Testing**: Test on Android and iOS devices
-- ⏳ **Demo Video**: Create hackathon submission video
+- ⏳ **Mobile Testing**: Optimizing for Android and iOS devices
+- ⏳ **Demo Video**: Creating the final hackathon showcase video
 
 ---
 
-*Date Created: January 27, 2026*
-*Last Updated: January 30, 2026*
+*Date Created: December 17, 2025*
+*Last Updated: January 31, 2026*
 
 ---
