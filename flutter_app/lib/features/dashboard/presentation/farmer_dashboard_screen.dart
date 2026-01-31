@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/color_palette.dart';
 import '../../../core/router/app_router.dart';
 import '../../auth/providers/auth_provider.dart';
+import 'providers/weather_provider.dart'; // Import Weather Provider
 import 'widgets/weather_card.dart';
 import 'widgets/action_card.dart';
 import 'widgets/recent_activity_list.dart';
@@ -18,43 +19,18 @@ import 'widgets/recent_activity_list.dart';
 /// 2. Weather Summary (WeatherCard) with Shimmer Loading
 /// 3. Quick Actions Grid (ActionCard)
 /// 4. Recent Activity (RecentActivityList)
-class FarmerDashboardScreen extends ConsumerStatefulWidget {
-  /// Whether to simulate an initial loading delay (for polish)
-  final bool simulateLoading;
-
-  const FarmerDashboardScreen({
-    super.key,
-    this.simulateLoading = true,
-  });
+class FarmerDashboardScreen extends ConsumerWidget {
+  const FarmerDashboardScreen({super.key});
 
   @override
-  ConsumerState<FarmerDashboardScreen> createState() => _FarmerDashboardScreenState();
-}
-
-class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
-  late bool _isLoading;
-
-  @override
-  void initState() {
-    super.initState();
-    // Initialize loading state based on config
-    _isLoading = widget.simulateLoading;
-
-    if (_isLoading) {
-      // Simulate network delay for polish
-      Future.delayed(const Duration(seconds: 2), () {
-        if (mounted) {
-          setState(() => _isLoading = false);
-        }
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     // Access authenticated user data
     final authState = ref.watch(authStateProvider);
     final user = authState.value;
+
+    // Access Weather State
+    final weatherState = ref.watch(weatherProvider);
+    final weather = weatherState.data;
 
     return Scaffold(
       backgroundColor: ColorPalette.offWhite,
@@ -65,12 +41,7 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ============================================
-                // HEADER SECTION
-                // ============================================
-                // ============================================
-                // HEADER SECTION
-                // ============================================
+                // ... (Header) ...
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -78,14 +49,14 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          "Hello,", // Changed from Namaste
+                          "Hello,", 
                           style: GoogleFonts.outfit(
                             fontSize: 16,
                             color: ColorPalette.textSecondary,
                           ),
                         ),
                         Text(
-                          user?.name ?? "Raju", // Fallback changed to Raju
+                          user?.name ?? "Raju", 
                           style: GoogleFonts.outfit(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
@@ -94,24 +65,25 @@ class _FarmerDashboardScreenState extends ConsumerState<FarmerDashboardScreen> {
                         ),
                       ],
                     ),
-                    // Profile/Logout Button
                     _buildProfileButton(context, ref),
                   ],
                 ),
                 
                 const SizedBox(height: 24),
                 
-                // ============================================
                 // WEATHER HERO CARD
-                // ============================================
-                // Pass _isLoading state to card
                 WeatherCard(
-                  isLoading: _isLoading,
-                  condition: "Sunny", // Demonstrate dynamic config
-                  temperature: 28,
+                  isLoading: weatherState.isLoading,
+                  condition: weather?['condition'] ?? "Sunny",
+                  temperature: (weather?['temperature'] as num?)?.toInt() ?? 28,
                 ).animate()
                     .fadeIn(duration: 600.ms)
                     .slideY(begin: 0.1, end: 0, curve: Curves.easeOut),
+                
+                const SizedBox(height: 32),
+                
+                // ... (Rest of UI) ...
+
                 
                 const SizedBox(height: 32),
                 
