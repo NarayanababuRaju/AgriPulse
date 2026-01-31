@@ -24,7 +24,8 @@ async def analyze_crop(
     farmer_id: str = Form(...),
     image: UploadFile = File(...),
     voice_transcription: str = Form(...),
-    weather_context: Optional[str] = Form(None)
+    weather_context: Optional[str] = Form(None),
+    language: Optional[str] = Form(None)
 ):
     """
     Analyze crop disease from image and voice input
@@ -35,20 +36,30 @@ async def analyze_crop(
     - **weather_context**: Optional weather data (JSON string)
     """
     try:
+        logger.debug(f"Received crop analysis request from farmer: {farmer_id}")
+        logger.debug(f"Voice transcription: {voice_transcription}")
+        logger.debug(f"Weather context: {weather_context}")
+        
         # Read image data
         image_data = await image.read()
+        logger.debug(f"Image read successfully, size: {len(image_data)} bytes")
         
         # Parse weather context if provided
         weather_dict = None
         if weather_context:
             import json
-            weather_dict = json.loads(weather_context)
+            try:
+                weather_dict = json.loads(weather_context)
+                logger.debug(f"Parsed weather context: {weather_dict}")
+            except Exception as je:
+                logger.warning(f"Failed to parse weather context JSON: {je}. Context was: {weather_context}")
         
         # Call Gemini service
         result = await gemini_service.analyze_crop_disease(
             image_data=image_data,
             voice_transcription=voice_transcription,
-            weather_context=weather_dict
+            weather_context=weather_dict,
+            language=language
         )
         
         if result["status"] == "error":
@@ -70,10 +81,12 @@ async def analyze_crop(
         return {
             "status": "success",
             "analysis_id": analysis_id,
-            "result": result["analysis"],
-            "model": result["model_used"]
+            "model": result["model_used"],
+            **result["analysis"] # Flatten Gemini analysis fields
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Crop analysis endpoint failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

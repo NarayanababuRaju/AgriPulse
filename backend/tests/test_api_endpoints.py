@@ -67,7 +67,7 @@ class TestCropAnalysisEndpoint:
         
         assert response.status_code == 200
         data = response.json()
-        assert "result" in data
+        assert "disease_name" in data
         assert "analysis_id" in data
         assert data["status"] == "success"
     
