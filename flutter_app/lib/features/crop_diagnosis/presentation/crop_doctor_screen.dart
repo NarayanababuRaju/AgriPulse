@@ -269,7 +269,7 @@ class _CropDoctorScreenState extends ConsumerState<CropDoctorScreen> {
                 ),
                 child: diagnosisState.diagnosisResult == null
                   ? _buildResultPlaceholder()
-                  : _buildResultContent(context, diagnosisState.diagnosisResult!),
+                  : _buildResultContent(context, diagnosisState.diagnosisResult!, diagnosisState, controller),
               ),
             ),
           ],
@@ -441,12 +441,12 @@ class _CropDoctorScreenState extends ConsumerState<CropDoctorScreen> {
   }
 
   /// Builds the Result Content (Mock Data Visualization)
-  Widget _buildResultContent(BuildContext context, Map<String, dynamic> result) {
+  Widget _buildResultContent(BuildContext context, Map<String, dynamic> result, DiagnosisState diagnosisState, DiagnosisController controller) {
     // Assuming structure: { 'disease': '...', 'confidence': 0.95, 'treatment': '...' }
     // Fallback values if keys are missing
-    final disease = result['disease_name'] ?? "Unknown Issue"; // Adapted to likely API key
-    final confidence = result['confidence_score'] ?? 0.85;
-    final treatment = result['treatment_recommendation'] ?? "Consult an expert.";
+    final disease = result['disease_name']?.toString() ?? "Unknown Issue"; // Adapted to likely API key
+    final confidence = (result['confidence_score'] is num) ? result['confidence_score'] : 0.85;
+    final treatment = result['treatment_recommendation']?.toString() ?? "Consult an expert.";
 
     return SingleChildScrollView(
       child: Column(
@@ -543,28 +543,47 @@ class _CropDoctorScreenState extends ConsumerState<CropDoctorScreen> {
 
           const SizedBox(height: 24),
           
-          // Audio / Voice (Future Placeholder)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.blue.shade50,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.blue.shade100),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.volume_up_rounded, color: Colors.blue.shade700),
-                const SizedBox(width: 12),
-                Text(
-                  "Listen to advice",
-                  style: TextStyle(
-                    color: Colors.blue.shade700,
-                    fontWeight: FontWeight.w600,
+          // Audio / Voice
+          InkWell(
+            onTap: diagnosisState.isSynthesizing ? null : () => controller.playAdvice(),
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.blue.shade100),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.volume_up_rounded, color: Colors.blue.shade700),
+                  const SizedBox(width: 12),
+                  Text(
+                    diagnosisState.isSynthesizing 
+                      ? "Getting audio..." 
+                      : (diagnosisState.isAudioPlaying ? "Playing advice..." : "Listen to advice"),
+                    style: TextStyle(
+                      color: Colors.blue.shade700,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                const Spacer(),
-                Icon(Icons.play_circle_fill_rounded, color: Colors.blue.shade700, size: 32),
-              ],
+                  const Spacer(),
+                  if (diagnosisState.isSynthesizing)
+                    const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.blue),
+                    )
+                  else
+                    Icon(
+                      diagnosisState.isAudioPlaying 
+                        ? Icons.pause_circle_filled_rounded 
+                        : Icons.play_circle_fill_rounded, 
+                      color: Colors.blue.shade700, 
+                      size: 32
+                    ),
+                ],
+              ),
             ),
           ),
 

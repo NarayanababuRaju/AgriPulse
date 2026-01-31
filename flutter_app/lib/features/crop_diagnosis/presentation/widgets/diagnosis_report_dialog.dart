@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../../core/theme/color_palette.dart';
-import '../../providers/diagnosis_provider.dart';
 
 class DiagnosisReportDialog extends StatelessWidget {
   final Map<String, dynamic> data;
@@ -16,9 +15,9 @@ class DiagnosisReportDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Extract data with fallbacks
-    final disease = data['disease_name'] ?? "Unknown Issue";
-    final confidence = data['confidence_score'] ?? 0.0;
-    final treatment = data['treatment_recommendation'] ?? "No specific treatment available.";
+    final disease = data['disease_name']?.toString() ?? "Unknown Issue";
+    final confidence = (data['confidence_score'] is num) ? data['confidence_score'] : 0.0;
+    final treatment = data['treatment_recommendation']?.toString() ?? "No specific treatment available.";
     final date = DateTime.now().toString().split(' ')[0]; // Mock Date
 
     return Dialog(
