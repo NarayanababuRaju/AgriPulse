@@ -6,6 +6,9 @@ abstract class ColorPalette {
   
   /// Primary Variant: Darker Green for depth.
   static const Color darkGreen = Color(0xFF1B5E20);
+  
+  /// Mint Green for secondary accents and gradients.
+  static const Color mintGreen = Color(0xFFA5D6A7);
 
   /// Secondary Color: Golden Sunlight - Represents energy, yield, and harvest.
   static const Color goldenSunlight = Color(0xFFFFC107);
