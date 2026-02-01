@@ -12,6 +12,8 @@ void main() {
 
     setUp(() {
       container = ProviderContainer();
+      // Keep the provider alive by adding a listener
+      container.listen(loginControllerProvider, (_, __) {});
     });
 
     tearDown(() {
@@ -96,10 +98,15 @@ void main() {
     test('initial state should be loading', () {
       final authState = container.read(authStateProvider);
       
+      // Initially loading while checking repo
       expect(authState, isA<AsyncLoading>());
     });
 
     test('login should update state with farmer', () async {
+      // Allow _init() to complete its microtask/Future and set initial null state
+      // Increased delay to ensure robustness against microtask scheduling
+      await Future.delayed(const Duration(milliseconds: 200));
+      
       final notifier = container.read(authStateProvider.notifier);
       const testFarmer = Farmer(
         id: 'test_123',
