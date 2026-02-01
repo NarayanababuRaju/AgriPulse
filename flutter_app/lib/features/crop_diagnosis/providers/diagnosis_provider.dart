@@ -127,6 +127,59 @@ class DiagnosisController extends StateNotifier<DiagnosisState> {
     }
   }
 
+  /// Translate the current diagnosis result
+  Future<void> translateDiagnosis(String languageName) async {
+    if (state.diagnosisResult == null) return;
+    
+    // Don't show full loading spinner, maybe just a smaller indicator or reuse analyzing?
+    // Re-using isAnalyzing might be confusing if it shows "Analyzing Crop...". 
+    // Ideally we add isTranslating, but for MVP let's just do it silently or reuse isAnalyzing with a different UI check?
+    // Let's reuse isAnalyzing but we need to arguably prevent the "Analyzing Crop" overlay if possible, or just accept it.
+    // Actually, the UI shows the overlay if isAnalyzing is true. That's fine, "Refining..."
+    state = state.copyWith(isAnalyzing: true);
+
+    try {
+      final currentResult = state.diagnosisResult!;
+      final disease = currentResult['disease_name'] ?? '';
+      final treatment = currentResult['treatment_recommendation'] ?? '';
+      final prevention = (currentResult['prevention'] as List?)?.join(' . ') ?? '';
+
+      // Format: "DISEASE_START...DISEASE_END..."
+      final fullText = """
+DISEASE_START
+$disease
+DISEASE_END
+TREATMENT_START
+$treatment
+TREATMENT_END
+PREVENTION_START
+$prevention
+PREVENTION_END
+""";
+
+      final translatedBlock = await _apiService.translateText(fullText, languageName);
+
+      // Parse
+      final diseaseMatch = RegExp(r'DISEASE_START\n(.*?)\nDISEASE_END', dotAll: true).firstMatch(translatedBlock);
+      final treatmentMatch = RegExp(r'TREATMENT_START\n(.*?)\nTREATMENT_END', dotAll: true).firstMatch(translatedBlock);
+      final preventionMatch = RegExp(r'PREVENTION_START\n(.*?)\nPREVENTION_END', dotAll: true).firstMatch(translatedBlock);
+      
+      final newDisease = diseaseMatch?.group(1)?.trim() ?? disease;
+      final newTreatment = treatmentMatch?.group(1)?.trim() ?? treatment;
+      final newPrevention = preventionMatch?.group(1)?.trim()?.split(' . ') ?? (currentResult['prevention'] as List?);
+
+      final newResult = Map<String, dynamic>.from(currentResult);
+      newResult['disease_name'] = newDisease;
+      newResult['treatment_recommendation'] = newTreatment;
+      newResult['prevention'] = newPrevention;
+
+      state = state.copyWith(isAnalyzing: false, diagnosisResult: newResult);
+    } catch (e) {
+      debugPrint("Diagnosis Translation Error: $e");
+      state = state.copyWith(isAnalyzing: false);
+    }
+  }
+
   /// Clear the selected image and results
   void clearImage() {
     _player.stop();

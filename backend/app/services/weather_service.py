@@ -57,8 +57,14 @@ class WeatherService:
     def _get_mock_forecast(self) -> Dict[str, Any]:
         return {
             "daily_summary": [
-                 {"time": "Tomorrow", "condition": "Clouds", "temp": 29.0, "rain_chance": 10}
+                 {"time": "Today", "condition": "Sunny", "temp": 28.5, "rain_chance": 0},
+                 {"time": "Tomorrow", "condition": "Sunny", "temp": 29.0, "rain_chance": 5},
+                 {"time": "Wed", "condition": "Cloudy", "temp": 27.5, "rain_chance": 20},
+                 {"time": "Thu", "condition": "Rain", "temp": 24.0, "rain_chance": 80},
+                 {"time": "Fri", "condition": "Rain", "temp": 23.5, "rain_chance": 70},
+                 {"time": "Sat", "condition": "Cloudy", "temp": 26.0, "rain_chance": 30},
+                 {"time": "Sun", "condition": "Sunny", "temp": 28.0, "rain_chance": 10},
             ],
-            "location": "Mock Location",
+            "location": "Namakkal, TN (Mock)",
             "source": "Mock Data"
         }

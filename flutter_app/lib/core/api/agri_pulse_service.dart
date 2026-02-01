@@ -50,6 +50,27 @@ class AgriPulseService {
       throw Exception("Upload failed: $e");
     }
   }
+  /// Get Weather Forecast (7-Day)
+  ///
+  /// Fetches daily forecast for the given coordinates.
+  Future<Map<String, dynamic>> getForecast(double lat, double lon) async {
+    try {
+      final response = await _dio.get(
+        '/api/weather/forecast',
+        queryParameters: {
+          'lat': lat,
+          'lon': lon,
+        },
+      );
+      return response.data;
+    } catch (e) {
+      if (e is DioException) {
+         throw Exception("Forecast API Error: ${e.message}");
+      }
+      throw Exception("Forecast fetch failed: $e");
+    }
+  }
+
   /// Get Current Weather
   /// 
   /// Fetches real-time weather for the given coordinates.
@@ -95,6 +116,69 @@ class AgriPulseService {
         throw Exception("Speech synthesis failed: ${e.message}");
       }
       throw Exception("Speech fetch failed: $e");
+    }
+  }
+
+  /// Predict Crop Yield
+  /// 
+  /// Calls Gemini 3.0 Pro reasoning for yield prediction.
+  Future<Map<String, dynamic>> predictYield({
+    required String farmerId,
+    required String cropName,
+    required double fieldArea,
+    required String plantedDate,
+    required String soilType,
+    required Map<String, dynamic> weatherForecast,
+    String? expectedHarvestDate,
+    String? language,
+  }) async {
+    try {
+      FormData formData = FormData.fromMap({
+        "farmer_id": farmerId,
+        "crop_name": cropName,
+        "field_area": fieldArea,
+        "planted_date": plantedDate,
+        "expected_harvest_date": expectedHarvestDate,
+        "soil_type": soilType,
+        "weather_forecast": jsonEncode(weatherForecast),
+        if (language != null) "language": language,
+      });
+
+      final response = await _dio.post(
+        '/api/crop/predict-yield',
+        data: formData,
+      );
+
+      return response.data;
+    } catch (e) {
+      if (e is DioException) {
+        throw Exception("Yield prediction failed: ${e.message}");
+      }
+      throw Exception("Yield prediction failed: $e");
+    }
+  }
+
+  /// Translate Text
+  /// 
+  /// Uses Gemini Flash for fast content translation.
+  Future<String> translateText(String text, String targetLanguage) async {
+    try {
+      FormData formData = FormData.fromMap({
+        "text": text,
+        "target_language": targetLanguage,
+      });
+
+      final response = await _dio.post(
+        '/api/utils/translate',
+        data: formData,
+      );
+
+      return response.data['translation'];
+    } catch (e) {
+      if (e is DioException) {
+        throw Exception("Translation failed: ${e.message}");
+      }
+      throw Exception("Translation failed: $e");
     }
   }
 }

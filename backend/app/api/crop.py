@@ -99,7 +99,9 @@ async def predict_yield(
     field_area: float = Form(...),
     planted_date: str = Form(...),
     soil_type: str = Form(...),
-    weather_forecast: str = Form(...)
+    weather_forecast: str = Form(...),
+    expected_harvest_date: Optional[str] = Form(None),
+    language: Optional[str] = Form(None)
 ):
     """
     Predict crop yield using Gemini Pro reasoning
@@ -118,6 +120,7 @@ async def predict_yield(
             "crop_name": crop_name,
             "field_area": field_area,
             "planted_date": planted_date,
+            "expected_harvest_date": expected_harvest_date,
             "soil_type": soil_type
         }
         
@@ -126,7 +129,8 @@ async def predict_yield(
         # Call Gemini Pro for yield prediction
         result = await gemini_service.predict_yield(
             crop_data=crop_data,
-            weather_forecast=weather_dict
+            weather_forecast=weather_dict,
+            language=language
         )
         
         if result["status"] == "error":

@@ -57,6 +57,22 @@ class OpenWeatherProvider(WeatherProvider):
                     "rain_chance": item.get("pop", 0) * 100
                 })
             
+            # OpenWeather Free Tier gives 5 days. Extrapolate to 7 for UI consistency.
+            if forecast_summary:
+                from datetime import datetime, timedelta
+                last_entry = forecast_summary[-1]
+                last_date = datetime.strptime(last_entry["time"], "%Y-%m-%d %H:%M:%S")
+                
+                while len(forecast_summary) < 7:
+                    last_date += timedelta(days=1)
+                    # Clone last day's weather
+                    forecast_summary.append({
+                        "time": last_date.strftime("%Y-%m-%d %H:%M:%S"),
+                        "condition": last_entry["condition"],
+                        "temp": last_entry["temp"],
+                        "rain_chance": last_entry["rain_chance"]
+                    })
+            
             return {
                 "daily_summary": forecast_summary,
                 "location": data["city"]["name"],

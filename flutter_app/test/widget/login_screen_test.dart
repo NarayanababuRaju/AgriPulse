@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_app/features/auth/presentation/farmer_login_screen.dart';
+import 'package:go_router/go_router.dart';
 
 /// Widget Tests for Farmer Login Screen
 /// 
@@ -111,10 +112,24 @@ void main() {
     });
 
     testWidgets('should verify OTP and show success', (tester) async {
+       final router = GoRouter(
+        initialLocation: '/login',
+        routes: [
+          GoRoute(
+            path: '/login',
+            builder: (context, state) => const FarmerLoginScreen(),
+          ),
+          GoRoute(
+            path: '/dashboard',
+            builder: (context, state) => const Scaffold(body: Text('Dashboard')),
+          ),
+        ],
+      );
+
       await tester.pumpWidget(
         ProviderScope(
-          child: MaterialApp(
-            home: const FarmerLoginScreen(),
+          child: MaterialApp.router(
+            routerConfig: router,
           ),
         ),
       );
@@ -136,8 +151,20 @@ void main() {
       await tester.tap(find.byKey(const Key('verify_button')));
       await tester.pumpAndSettle();
 
-      // Should show success message (navigation happens via listener)
-      expect(find.text('Login Successful!'), findsOneWidget);
+      // Should show success message (navigation happens via listener, triggering context.go)
+      // Since we mock the dashboard route, we can check if we navigated or just check successful state
+      // Actually, FarmerLoginScreen shows snackbar on error, but on success it just navigates.
+      // So finding 'Login Successful!' text might be relying on something else?
+      // Wait, app_flow_test checked for 'Login Successful!', but login_screen_test expects it too.
+      // FarmerLoginScreen doesn't have 'Login Successful!' text. It navigates.
+      // The integration test might have added it?
+      // Ah, lines 49-62 of FarmerLoginScreen:
+      // if (next.status == LoginStatus.authenticated) { context.go... }
+      // else if error ... showSnackBar.
+      // There is NO "Login Successful!" text/snackbar on success in the code I read (lines 1-293 of FarmerLoginScreen).
+      // So the test expectation "expect(find.text('Login Successful!'), findsOneWidget);" is WRONG unless the Dashboard screen says it.
+      // My mock dashboard says 'Dashboard'. So I should check for that.
+      expect(find.text('Dashboard'), findsOneWidget);
     });
   });
 }

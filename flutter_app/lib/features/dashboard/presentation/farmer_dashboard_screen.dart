@@ -11,6 +11,7 @@ import 'providers/weather_provider.dart'; // Import Weather Provider
 import 'widgets/weather_card.dart';
 import 'widgets/action_card.dart';
 import 'widgets/recent_activity_list.dart';
+import '../../yield_prediction/providers/language_provider.dart';
 
 /// FarmerDashboardScreen - The main home screen for the farmer
 /// 
@@ -32,6 +33,12 @@ class FarmerDashboardScreen extends ConsumerWidget {
     final weatherState = ref.watch(weatherProvider);
     final weather = weatherState.data;
 
+    // Translation Helper
+    // We watch the language provider state to rebuild updates, 
+    // and use the notifier to look up strings.
+    ref.watch(languageProvider); 
+    final tr = ref.read(languageProvider.notifier).translate;
+
     return Scaffold(
       backgroundColor: ColorPalette.offWhite,
       body: SafeArea(
@@ -49,7 +56,7 @@ class FarmerDashboardScreen extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          "Hello,", 
+                          "${tr('hello')},", 
                           style: GoogleFonts.outfit(
                             fontSize: 16,
                             color: ColorPalette.textSecondary,
@@ -65,7 +72,51 @@ class FarmerDashboardScreen extends ConsumerWidget {
                         ),
                       ],
                     ),
-                    _buildProfileButton(context, ref),
+                    Row(
+                      children: [
+                        // Language Dropdown
+                        Consumer(
+                          builder: (context, ref, _) {
+                            final language = ref.watch(languageProvider);
+                            return Container(
+                              margin: const EdgeInsets.only(right: 12),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: Colors.grey.shade300),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<AppLanguage>(
+                                  value: language,
+                                  isDense: true,
+                                  icon: const Icon(Icons.language, size: 18, color: ColorPalette.emeraldGreen),
+                                  items: AppLanguage.values.map((lang) {
+                                    return DropdownMenuItem(
+                                      value: lang,
+                                      child: Text(
+                                        lang == AppLanguage.en ? "English" :
+                                        lang == AppLanguage.hi ? "हिन्दी" :
+                                        lang == AppLanguage.ta ? "தமிழ்" :
+                                        lang == AppLanguage.kn ? "ಕನ್ನಡ" :
+                                        lang == AppLanguage.te ? "తెలుగు" : "മലയാളം",
+                                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                                      ),
+                                    );
+                                  }).toList(),
+                                  onChanged: (lang) {
+                                    if (lang != null) {
+                                      ref.read(languageProvider.notifier).setLanguage(lang);
+                                    }
+                                  },
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                        _buildProfileButton(context, ref),
+                      ],
+                    ),
                   ],
                 ),
                 
@@ -76,6 +127,8 @@ class FarmerDashboardScreen extends ConsumerWidget {
                   isLoading: weatherState.isLoading,
                   condition: weather?['condition'] ?? "Sunny",
                   temperature: (weather?['temperature'] as num?)?.toInt() ?? 28,
+                  location: weather?['location'] ?? "Namakkal, Tamil Nadu",
+                  date: DateTime.now(),
                 ).animate()
                     .fadeIn(duration: 600.ms)
                     .slideY(begin: 0.1, end: 0, curve: Curves.easeOut),
@@ -94,7 +147,7 @@ class FarmerDashboardScreen extends ConsumerWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      "Smart Tools", // Updated Header
+                      tr('smart_tools'), // Updated Header
                       style: GoogleFonts.outfit(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -115,7 +168,7 @@ class FarmerDashboardScreen extends ConsumerWidget {
                       // CROP DOCTOR (Primary Feature)
                       _buildCompactActionCard(
                         context,
-                        title: "Crop Doctor",
+                        title: tr('crop_doctor'),
                         icon: Icons.local_hospital_rounded,
                         color: ColorPalette.rustRed,
                         onTap: () => context.push(AppRouter.cropDoctorPath),
@@ -126,14 +179,10 @@ class FarmerDashboardScreen extends ConsumerWidget {
                       // YIELD PREDICTOR
                        _buildCompactActionCard(
                         context,
-                        title: "Yield Est.",
+                        title: tr('yield_est'),
                         icon: Icons.trending_up_rounded,
                         color: ColorPalette.goldenSunlight,
-                        onTap: () {
-                           ScaffoldMessenger.of(context).showSnackBar(
-                             const SnackBar(content: Text("Coming Soon in Phase 3!")),
-                          );
-                        },
+                        onTap: () => context.push(AppRouter.yieldPredictionPath),
                         delay: 300,
                       ),
                       const SizedBox(width: 16),
@@ -141,7 +190,7 @@ class FarmerDashboardScreen extends ConsumerWidget {
                       // MARKET PRICES
                        _buildCompactActionCard(
                         context,
-                        title: "Market",
+                        title: tr('market'),
                         icon: Icons.currency_rupee_rounded,
                         color: ColorPalette.emeraldGreen,
                         onTap: () {},
@@ -152,7 +201,7 @@ class FarmerDashboardScreen extends ConsumerWidget {
                       // EXPERT HELP
                        _buildCompactActionCard(
                         context,
-                        title: "Ask Expert",
+                        title: tr('ask_expert'),
                         icon: Icons.support_agent_rounded,
                         color: Colors.blueAccent,
                          onTap: () {},

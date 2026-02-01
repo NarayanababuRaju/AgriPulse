@@ -4,19 +4,33 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_app/features/auth/presentation/farmer_login_screen.dart';
 import 'package:flutter_app/features/dashboard/presentation/farmer_dashboard_screen.dart';
 import 'package:flutter_app/features/crop_diagnosis/presentation/crop_doctor_screen.dart';
+import 'package:go_router/go_router.dart';
 
 /// Integration Tests for Complete User Flows
 /// 
 /// Tests end-to-end user journeys through the application.
-/// Note: These tests focus on individual screen flows rather than full navigation
-/// due to GoRouter complexity in test environment.
+/// Uses GoRouter in test harness to support specific screen transitions.
 void main() {
   group('Authentication Flow Tests', () {
     testWidgets('complete login flow should work', (tester) async {
+       final router = GoRouter(
+        initialLocation: '/login',
+        routes: [
+          GoRoute(
+            path: '/login',
+            builder: (context, state) => const FarmerLoginScreen(),
+          ),
+          GoRoute(
+            path: '/dashboard',
+            builder: (context, state) => const Scaffold(body: Text('Dashboard Screen')),
+          ),
+        ],
+      );
+
       await tester.pumpWidget(
-        ProviderScope(
-          child: const MaterialApp(
-            home: FarmerLoginScreen(),
+         ProviderScope(
+          child: MaterialApp.router(
+            routerConfig: router,
           ),
         ),
       );
@@ -50,15 +64,25 @@ void main() {
       await tester.tap(find.byKey(const Key('verify_button')));
       await tester.pumpAndSettle();
 
-      // Should show success message
-      expect(find.text('Login Successful!'), findsOneWidget);
+      // Should show success message / Navigate to Dashboard
+      expect(find.text('Dashboard Screen'), findsOneWidget);
     });
 
     testWidgets('should handle invalid phone number', (tester) async {
+      final router = GoRouter(
+        initialLocation: '/login',
+        routes: [
+          GoRoute(
+            path: '/login',
+            builder: (context, state) => const FarmerLoginScreen(),
+          ),
+        ],
+      );
+
       await tester.pumpWidget(
         ProviderScope(
-          child: const MaterialApp(
-            home: FarmerLoginScreen(),
+          child: MaterialApp.router(
+            routerConfig: router,
           ),
         ),
       );
@@ -79,10 +103,20 @@ void main() {
     });
 
     testWidgets('should handle incorrect OTP', (tester) async {
+      final router = GoRouter(
+        initialLocation: '/login',
+        routes: [
+          GoRoute(
+            path: '/login',
+            builder: (context, state) => const FarmerLoginScreen(),
+          ),
+        ],
+      );
+
       await tester.pumpWidget(
         ProviderScope(
-          child: const MaterialApp(
-            home: FarmerLoginScreen(),
+          child: MaterialApp.router(
+            routerConfig: router,
           ),
         ),
       );
@@ -112,10 +146,20 @@ void main() {
 
   group('Dashboard Screen Tests', () {
     testWidgets('dashboard should render all sections', (tester) async {
+       final router = GoRouter(
+        initialLocation: '/dashboard',
+        routes: [
+          GoRoute(
+            path: '/dashboard',
+            builder: (context, state) => const FarmerDashboardScreen(),
+          ),
+        ],
+      );
+
       await tester.pumpWidget(
         ProviderScope(
-          child: const MaterialApp(
-            home: FarmerDashboardScreen(),
+          child: MaterialApp.router(
+            routerConfig: router,
           ),
         ),
       );
@@ -136,10 +180,20 @@ void main() {
 
   group('Crop Diagnosis Screen Tests', () {
     testWidgets('crop doctor screen should render picker', (tester) async {
+      final router = GoRouter(
+        initialLocation: '/doctor',
+        routes: [
+          GoRoute(
+            path: '/doctor',
+            builder: (context, state) => const CropDoctorScreen(),
+          ),
+        ],
+      );
+
       await tester.pumpWidget(
         ProviderScope(
-          child: const MaterialApp(
-            home: CropDoctorScreen(),
+          child: MaterialApp.router(
+            routerConfig: router,
           ),
         ),
       );
@@ -157,12 +211,29 @@ void main() {
     testWidgets('login to dashboard transition data flow', (tester) async {
       // This tests that the login state can be set and read
       final container = ProviderContainer();
+      addTearDown(container.dispose);
+      // Keep provider alive to prevent disposal during navigation in test
+      container.listen(loginControllerProvider, (_, __) {});
       
+      final router = GoRouter(
+        initialLocation: '/login',
+        routes: [
+          GoRoute(
+            path: '/login',
+            builder: (context, state) => const FarmerLoginScreen(),
+          ),
+          GoRoute(
+            path: '/dashboard',
+            builder: (context, state) => const Scaffold(body: Text('Dashboard Screen')),
+          ),
+        ],
+      );
+
       await tester.pumpWidget(
         UncontrolledProviderScope(
           container: container,
-          child: const MaterialApp(
-            home: FarmerLoginScreen(),
+          child: MaterialApp.router(
+            routerConfig: router,
           ),
         ),
       );
@@ -185,9 +256,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Success message should appear
-      expect(find.text('Login Successful!'), findsOneWidget);
-      
-      container.dispose();
+      expect(find.text('Dashboard Screen'), findsOneWidget);
     });
   });
 }
