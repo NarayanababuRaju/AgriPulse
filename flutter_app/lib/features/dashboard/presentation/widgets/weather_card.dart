@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:flutter_app/core/theme/color_palette.dart';
 import '../../../../core/components/loading_shimmer.dart';
 
@@ -6,25 +7,38 @@ import '../../../../core/components/loading_shimmer.dart';
 /// 
 /// A visually appealing card using a gradient background to represent 
 /// the "Earth & Growth" theme. Supports Shimmer Loading.
+
 class WeatherCard extends StatelessWidget {
   final bool isLoading;
   final String condition;
   final int temperature;
+  final String location;
+  final DateTime? date;
 
   const WeatherCard({
     super.key, 
     this.isLoading = false,
-    this.condition = "Sunny", // Default mock
-    this.temperature = 28,   // Default mock
+    this.condition = "Sunny", 
+    this.temperature = 28,
+    this.location = "Namakkal, Tamil Nadu",
+    this.date,
   });
 
-  // Helper to get gradient based on weather condition
   LinearGradient _getWeatherGradient() {
     final cond = condition.toLowerCase();
+    
     if (cond.contains('sunny') || cond.contains('clear')) {
-      // Sunny: Golden/Yellow gradient
+      // Cold & Sunny/Clear? (e.g. Winter morning)
+      if (temperature < 25) {
+        return const LinearGradient(
+          colors: [Color(0xFF4FC3F7), Color(0xFF0288D1)], // Light Blue to Blue (Cool)
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        );
+      }
+      // Warm & Sunny
       return const LinearGradient(
-        colors: [Color(0xFFFFB300), Color(0xFFFF6F00)], // Ambver to Orange
+        colors: [Color(0xFFFFB300), Color(0xFFFF6F00)], // Amber to Orange (Warm)
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       );
@@ -48,6 +62,9 @@ class WeatherCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (isLoading) return _buildSkeleton();
+    
+    final displayDate = date ?? DateTime.now();
+    final dateStr = "Today, ${DateFormat('d MMM').format(displayDate)}";
 
     return Container(
       width: double.infinity,
@@ -56,7 +73,7 @@ class WeatherCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: _getWeatherGradient().colors.first.withValues(alpha: 0.3),
+            color: Colors.black.withOpacity(0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -73,24 +90,25 @@ class WeatherCard extends StatelessWidget {
               children: [
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
+                  children: [
                     Text(
-                      "Namakkal, Tamil Nadu",
-                      style: TextStyle(
+                      location,
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 16,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
                     Text(
-                      "Today, 29 Jan",
-                      style: TextStyle(
+                      dateStr,
+                      style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 12,
                       ),
                     ),
                   ],
                 ),
+                // ... icon ...
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: const BoxDecoration(
