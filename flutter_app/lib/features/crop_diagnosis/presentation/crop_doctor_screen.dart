@@ -12,6 +12,7 @@ import '../../../core/theme/color_palette.dart';
 import '../../../core/utils/error_handler.dart';
 import '../providers/diagnosis_provider.dart';
 import 'widgets/diagnosis_report_dialog.dart';
+import '../../yield_prediction/providers/language_provider.dart';
 
 /// Crop Doctor Screen
 /// 
@@ -56,8 +57,9 @@ class _CropDoctorScreenState extends ConsumerState<CropDoctorScreen> {
         setState(() => _isListening = true);
         
         // Get user's preferred language
-        final authState = ref.read(authStateProvider);
-        final String languageCode = authState.value?.language ?? 'en';
+        // Get user's preferred language
+        final language = ref.read(languageProvider);
+        final String languageCode = language.name; // 'en', 'hi', etc.
         final String localeId = _mapLanguageToLocale(languageCode);
         
         debugPrint("Listening in locale: $localeId");
@@ -112,10 +114,13 @@ class _CropDoctorScreenState extends ConsumerState<CropDoctorScreen> {
       }
     });
 
+    ref.watch(languageProvider);
+    final tr = ref.read(languageProvider.notifier).translate;
+
     return Scaffold(
       backgroundColor: ColorPalette.offWhite,
       appBar: AppBar(
-        title: const Text("Crop Doctor"),
+        title: Text(tr('crop_doctor')),
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
@@ -123,6 +128,55 @@ class _CropDoctorScreenState extends ConsumerState<CropDoctorScreen> {
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
           onPressed: () => context.pop(),
         ),
+        actions: [
+          // Language Dropdown
+          Consumer(
+            builder: (context, ref, _) {
+              final language = ref.watch(languageProvider);
+              return Container(
+                margin: const EdgeInsets.only(right: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: DropdownButton<AppLanguage>(
+                  value: language,
+                  underline: const SizedBox(),
+                  icon: const Icon(Icons.language, size: 20, color: ColorPalette.emeraldGreen),
+                  items: AppLanguage.values.map((lang) {
+                    return DropdownMenuItem(
+                      value: lang,
+                      child: Text(
+                        lang == AppLanguage.en ? "English" :
+                        lang == AppLanguage.hi ? "हिन्दी" :
+                        lang == AppLanguage.ta ? "தமிழ்" :
+                        lang == AppLanguage.kn ? "ಕನ್ನಡ" :
+                        lang == AppLanguage.te ? "తెలుగు" : "മലയാളം",
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (lang) {
+                    if (lang != null) {
+                      ref.read(languageProvider.notifier).setLanguage(lang);
+                      // Trigger Smart Translation if result exists
+                      if (ref.read(diagnosisProvider).diagnosisResult != null) {
+                         final languageName = lang == AppLanguage.en ? "English" : 
+                                              lang == AppLanguage.hi ? "हिन्दी" :
+                                              lang == AppLanguage.ta ? "தமிழ்" :
+                                              lang == AppLanguage.kn ? "ಕನ್ನಡ" :
+                                              lang == AppLanguage.te ? "తెలుగు" : "മലയാളം";
+                         ref.read(diagnosisProvider.notifier).translateDiagnosis(languageName);
+                      }
+                    }
+                  },
+                ),
+              );
+            },
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(24.0),
@@ -137,18 +191,18 @@ class _CropDoctorScreenState extends ConsumerState<CropDoctorScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
-                    "Upload Crop Image",
-                    style: TextStyle(
+                  Text(
+                    tr('upload_crop_image'),
+                    style: const TextStyle(
                       fontSize: 20, 
                       fontWeight: FontWeight.bold, 
                       color: ColorPalette.textPrimary
                     ),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
-                    "Take a clear photo of the affected area",
-                    style: TextStyle(fontSize: 14, color: ColorPalette.textSecondary),
+                  Text(
+                    tr('take_photo_instruction'),
+                    style: const TextStyle(fontSize: 14, color: ColorPalette.textSecondary),
                   ),
                   const SizedBox(height: 24),
                   
@@ -173,8 +227,8 @@ class _CropDoctorScreenState extends ConsumerState<CropDoctorScreen> {
                         ],
                       ),
                       child: diagnosisState.imageFile == null
-                          ? _buildPicker(context, controller)
-                          : _buildPreview(context, controller, diagnosisState),
+                          ? _buildPicker(context, controller, tr)
+                          : _buildPreview(context, controller, diagnosisState, tr),
                     ),
                   ),
 
@@ -185,11 +239,57 @@ class _CropDoctorScreenState extends ConsumerState<CropDoctorScreen> {
                     controller: _textController,
                     onChanged: (value) => controller.setDescription(value),
                     decoration: InputDecoration(
-                      hintText: "Describe issue (e.g., in Tamil/Telugu/Malayalam/Kannada/Hindi)",
+                      hintText: tr('describe_issue_hint'),
                       hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
                       filled: true,
                       fillColor: Colors.white,
-                      prefixIcon: const Icon(Icons.translate, color: ColorPalette.textSecondary),
+                      prefixIcon: Consumer(
+                        builder: (context, ref, _) {
+                          final currentLang = ref.watch(languageProvider);
+                          return Padding(
+                            padding: const EdgeInsets.only(left: 12.0, right: 8.0),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<AppLanguage>(
+                                value: currentLang,
+                                icon: const Icon(Icons.arrow_drop_down, size: 18, color: ColorPalette.textSecondary),
+                                isDense: true,
+                                alignment: AlignmentDirectional.center,
+                                onChanged: (AppLanguage? newValue) {
+                                  if (newValue != null) {
+                                    ref.read(languageProvider.notifier).setLanguage(newValue);
+                                    // Trigger translation if result exists
+                                    if (ref.read(diagnosisProvider).diagnosisResult != null) {
+                                      final languageName = newValue == AppLanguage.en ? "English" : 
+                                                          newValue == AppLanguage.hi ? "हिन्दी" :
+                                                          newValue == AppLanguage.ta ? "தமிழ்" :
+                                                          newValue == AppLanguage.kn ? "ಕನ್ನಡ" :
+                                                          newValue == AppLanguage.te ? "తెలుగు" : "മലയാളം";
+                                      ref.read(diagnosisProvider.notifier).translateDiagnosis(languageName);
+                                    }
+                                  }
+                                },
+                                items: AppLanguage.values.map((lang) {
+                                  return DropdownMenuItem(
+                                    value: lang,
+                                    child: Text(
+                                      lang == AppLanguage.en ? "English" :
+                                      lang == AppLanguage.hi ? "हिन्दी" :
+                                      lang == AppLanguage.ta ? "தமிழ்" :
+                                      lang == AppLanguage.kn ? "ಕನ್ನಡ" :
+                                      lang == AppLanguage.te ? "తెలుగు" : "മലയാളം",
+                                      style: const TextStyle(
+                                        fontSize: 13, 
+                                        fontWeight: FontWeight.bold, 
+                                        color: ColorPalette.textPrimary
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
                       
                       // MIC BUTTON
                       suffixIcon: GestureDetector(
@@ -237,9 +337,9 @@ class _CropDoctorScreenState extends ConsumerState<CropDoctorScreen> {
                       ),
                       child: diagnosisState.isAnalyzing
                           ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text(
-                              "Analyze Crop",
-                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          : Text(
+                              tr('analyze_crop'),
+                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                             ),
                     ),
                   ).animate().fadeIn(),
@@ -268,8 +368,8 @@ class _CropDoctorScreenState extends ConsumerState<CropDoctorScreen> {
                   ],
                 ),
                 child: diagnosisState.diagnosisResult == null
-                  ? _buildResultPlaceholder()
-                  : _buildResultContent(context, diagnosisState.diagnosisResult!, diagnosisState, controller),
+                  ? _buildResultPlaceholder(tr)
+                  : _buildResultContent(context, diagnosisState.diagnosisResult!, diagnosisState, controller, tr),
               ),
             ),
           ],
@@ -279,7 +379,7 @@ class _CropDoctorScreenState extends ConsumerState<CropDoctorScreen> {
   }
 
   /// Builds the Image Picker UI (Camera/Gallery buttons)
-  Widget _buildPicker(BuildContext context, DiagnosisController controller) {
+  Widget _buildPicker(BuildContext context, DiagnosisController controller, String Function(String) tr) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -291,18 +391,18 @@ class _CropDoctorScreenState extends ConsumerState<CropDoctorScreen> {
         
         const SizedBox(height: 24),
         
-        const Text(
-            "Upload Image",
-            style: TextStyle(
+        Text(
+            tr('upload_image'),
+            style: const TextStyle(
                 fontSize: 20, 
                 fontWeight: FontWeight.bold, 
                 color: ColorPalette.textPrimary
             ),
         ),
         const SizedBox(height: 8),
-        const Text(
-            "Supports: JPG, PNG",
-            style: TextStyle(color: Colors.grey),
+         Text(
+            tr('supports_formats'),
+            style: const TextStyle(color: Colors.grey),
         ),
         
         const SizedBox(height: 48),
@@ -314,14 +414,14 @@ class _CropDoctorScreenState extends ConsumerState<CropDoctorScreen> {
                 _buildOptionButton(
                     context, 
                     icon: Icons.camera_alt_rounded, 
-                    label: "Camera",
+                    label: tr('camera'),
                     onTap: () => controller.pickImage(ImageSource.camera),
                 ),
                 const SizedBox(width: 24),
                 _buildOptionButton(
                     context, 
                     icon: Icons.photo_library_rounded, 
-                    label: "Gallery",
+                    label: tr('gallery'),
                     onTap: () => controller.pickImage(ImageSource.gallery),
                 ),
             ],
@@ -354,7 +454,7 @@ class _CropDoctorScreenState extends ConsumerState<CropDoctorScreen> {
   }
 
   /// Builds the Image Preview UI
-  Widget _buildPreview(BuildContext context, DiagnosisController controller, DiagnosisState state) {
+  Widget _buildPreview(BuildContext context, DiagnosisController controller, DiagnosisState state, String Function(String) tr) {
       return Stack(
           fit: StackFit.expand,
           children: [
@@ -391,18 +491,18 @@ class _CropDoctorScreenState extends ConsumerState<CropDoctorScreen> {
                          color: Colors.black.withValues(alpha: 0.6),
                          borderRadius: BorderRadius.circular(24),
                      ),
-                     child: const Center(
+                     child: Center(
                          child: Column(
                              mainAxisSize: MainAxisSize.min,
                              children: [
                                  Text(
-                                     "Analyzing Crop...",
-                                     style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                                     tr('analyzing'),
+                                     style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                                  ),
-                                 SizedBox(height: 8),
+                                 const SizedBox(height: 8),
                                  Text(
-                                     "Identifying potential diseases",
-                                     style: TextStyle(color: Colors.white70, fontSize: 14),
+                                     tr('identifying_diseases'),
+                                     style: const TextStyle(color: Colors.white70, fontSize: 14),
                                  ),
                              ],
                          ),
@@ -412,7 +512,7 @@ class _CropDoctorScreenState extends ConsumerState<CropDoctorScreen> {
       ).animate().fadeIn();
   }
   /// Builds the placeholder for the Right Panel
-  Widget _buildResultPlaceholder() {
+  Widget _buildResultPlaceholder(String Function(String) tr) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -423,7 +523,7 @@ class _CropDoctorScreenState extends ConsumerState<CropDoctorScreen> {
         ),
         const SizedBox(height: 16),
         Text(
-          "Diagnosis Results",
+          tr('diagnosis_results'),
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
@@ -432,7 +532,7 @@ class _CropDoctorScreenState extends ConsumerState<CropDoctorScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          "Upload an image and click analyze\nto see detailed report here.",
+          tr('diagnosis_placeholder'),
           textAlign: TextAlign.center,
           style: TextStyle(color: Colors.grey.shade400),
         ),
@@ -441,7 +541,7 @@ class _CropDoctorScreenState extends ConsumerState<CropDoctorScreen> {
   }
 
   /// Builds the Result Content (Mock Data Visualization)
-  Widget _buildResultContent(BuildContext context, Map<String, dynamic> result, DiagnosisState diagnosisState, DiagnosisController controller) {
+  Widget _buildResultContent(BuildContext context, Map<String, dynamic> result, DiagnosisState diagnosisState, DiagnosisController controller, String Function(String) tr) {
     // Assuming structure: { 'disease': '...', 'confidence': 0.95, 'treatment': '...' }
     // Fallback values if keys are missing
     final disease = result['disease_name']?.toString() ?? "Unknown Issue"; // Adapted to likely API key
@@ -468,9 +568,9 @@ class _CropDoctorScreenState extends ConsumerState<CropDoctorScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      "Detected Issue",
-                      style: TextStyle(color: Colors.grey, fontSize: 12),
+                    Text(
+                      tr('detected_issue'),
+                      style: const TextStyle(color: Colors.grey, fontSize: 12),
                     ),
                     Text(
                       disease,
@@ -492,7 +592,7 @@ class _CropDoctorScreenState extends ConsumerState<CropDoctorScreen> {
                   border: Border.all(color: Colors.green.shade200),
                 ),
                 child: Text(
-                  "${(confidence * 100).toInt()}% Confidence",
+                  "${(confidence * 100).toInt()}% ${tr('confidence')}",
                   style: TextStyle(
                     color: Colors.green.shade700,
                     fontWeight: FontWeight.bold,
@@ -506,9 +606,9 @@ class _CropDoctorScreenState extends ConsumerState<CropDoctorScreen> {
           const Divider(height: 48),
 
           // Treatment Section
-          const Text(
-            "Recommended Treatment",
-            style: TextStyle(
+          Text(
+            tr('recommended_treatment'),
+            style: const TextStyle(
               fontSize: 18, 
               fontWeight: FontWeight.bold,
               color: ColorPalette.textPrimary,
@@ -560,8 +660,8 @@ class _CropDoctorScreenState extends ConsumerState<CropDoctorScreen> {
                   const SizedBox(width: 12),
                   Text(
                     diagnosisState.isSynthesizing 
-                      ? "Getting audio..." 
-                      : (diagnosisState.isAudioPlaying ? "Playing advice..." : "Listen to advice"),
+                      ? tr('getting_audio') 
+                      : (diagnosisState.isAudioPlaying ? tr('playing_advice') : tr('listen_advice')),
                     style: TextStyle(
                       color: Colors.blue.shade700,
                       fontWeight: FontWeight.w600,
@@ -603,9 +703,9 @@ class _CropDoctorScreenState extends ConsumerState<CropDoctorScreen> {
                 );
               },
               icon: const Icon(Icons.summarize_outlined, color: ColorPalette.emeraldGreen),
-              label: const Text(
-                "Generate Report",
-                style: TextStyle(color: ColorPalette.emeraldGreen, fontWeight: FontWeight.bold),
+              label: Text(
+                tr('generate_report'),
+                style: const TextStyle(color: ColorPalette.emeraldGreen, fontWeight: FontWeight.bold),
               ),
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
