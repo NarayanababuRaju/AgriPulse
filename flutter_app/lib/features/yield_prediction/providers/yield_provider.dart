@@ -3,6 +3,8 @@ import 'package:flutter_app/core/api/agri_pulse_service.dart';
 import 'package:flutter_app/features/dashboard/presentation/providers/weather_provider.dart';
 import 'package:flutter_app/features/yield_prediction/domain/entities/yield_prediction.dart';
 import 'package:flutter_app/features/yield_prediction/providers/language_provider.dart';
+import 'package:flutter_app/core/services/local_vault.dart';
+import 'package:flutter_app/features/yield_prediction/models/yield_record.dart';
 import 'package:flutter/foundation.dart';
 
 class YieldState {
@@ -99,6 +101,19 @@ class YieldController extends StateNotifier<YieldState> {
           response['prediction_id'], 
           response['result']
         );
+
+        // Save to History
+        final record = YieldRecord(
+          id: prediction.id,
+          cropName: state.cropName,
+          fieldName: state.fieldName,
+          expectedYield: prediction.expectedYield,
+          confidence: prediction.confidence,
+          timestamp: DateTime.now(),
+          rawAiResponse: response['result'],
+        );
+        await LocalVault().saveYield(record);
+
         state = state.copyWith(isLoading: false, result: prediction);
       } else {
         throw Exception(response['error'] ?? "Unknown error from AI");
@@ -164,4 +179,8 @@ class YieldController extends StateNotifier<YieldState> {
 final yieldProvider = StateNotifierProvider.autoDispose<YieldController, YieldState>((ref) {
   final apiService = ref.watch(agriPulseServiceProvider);
   return YieldController(apiService, ref);
+});
+
+final yieldHistoryProvider = FutureProvider<List<YieldRecord>>((ref) async {
+  return LocalVault().getYieldHistory();
 });

@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
-import 'package:go_router/go_router.dart';
+
 
 import 'package:flutter_app/core/theme/color_palette.dart';
 import 'package:flutter_app/features/yield_prediction/providers/yield_provider.dart';
@@ -14,6 +14,7 @@ import 'package:flutter_app/features/financial_model/data/market_data_service.da
 import 'package:flutter_app/features/financial_model/domain/financial_calculator.dart';
 import 'package:flutter_app/features/financial_model/presentation/financial_outlook_widget.dart';
 import 'package:flutter_app/features/yield_prediction/presentation/widgets/yield_header_card.dart';
+import 'package:flutter_app/features/yield_prediction/presentation/widgets/yield_result_view.dart';
 
 class YieldPredictionScreen extends ConsumerStatefulWidget {
   const YieldPredictionScreen({super.key});
@@ -258,7 +259,18 @@ class _YieldPredictionScreenState extends ConsumerState<YieldPredictionScreen> {
                           width: double.infinity,
                           height: 52,
                           child: ElevatedButton(
-                            onPressed: yieldState.isLoading ? null : () => yieldNotifier.predictYield(),
+                            onPressed: yieldState.isLoading ? null : () {
+                              if (yieldState.expectedHarvestDate == null) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(languageNotifier.translate('select_harvest_date')),
+                                    backgroundColor: Colors.orange,
+                                  ),
+                                );
+                                return;
+                              }
+                              yieldNotifier.predictYield();
+                            },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: ColorPalette.emeraldGreen,
                               foregroundColor: Colors.white,
@@ -360,23 +372,29 @@ class _YieldPredictionScreenState extends ConsumerState<YieldPredictionScreen> {
             ),
           ),
 
-          // RIGHT SIDE: Result Panel
-          Expanded(
-            child: Container(
-              color: Colors.white,
-              child: yieldState.isLoading
-                  ? _buildLoadingState()
-                  : yieldState.result != null
-                      ? _buildResultContent(yieldState.result!)
-                      : _buildResultPlaceholder(),
+                // RIGHT SIDE: Result Panel
+                Expanded(
+                  child: Container(
+                    color: Colors.white,
+                    child: yieldState.isLoading
+                        ? _buildLoadingState()
+                        : yieldState.errorMessage != null
+                            ? _buildErrorState(yieldState.errorMessage!)
+                            : yieldState.result != null
+                                ? YieldResultView(
+                                    result: yieldState.result!,
+                                    cropName: yieldState.cropName,
+                                    fieldArea: yieldState.fieldArea,
+                                  )
+                                : _buildResultPlaceholder(),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
       ),
-    ),
-    ],
-  ),
-);
+    );
   }
 
   Widget _buildLoadingState() {
@@ -399,7 +417,42 @@ class _YieldPredictionScreenState extends ConsumerState<YieldPredictionScreen> {
     );
   }
 
-Widget _buildResultPlaceholder() {
+  Widget _buildErrorState(String error) {
+    final languageNotifier = ref.read(languageProvider.notifier);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline_rounded, color: Colors.orange, size: 64),
+            const SizedBox(height: 16),
+            Text(
+              languageNotifier.translate('prediction_failed'),
+              style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: ColorPalette.textPrimary),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              error,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.outfit(fontSize: 14, color: ColorPalette.textSecondary),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () => ref.read(yieldProvider.notifier).predictYield(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ColorPalette.emeraldGreen,
+                foregroundColor: Colors.white,
+              ),
+              child: Text(languageNotifier.translate('retry')),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildResultPlaceholder() {
     String tr(String key) => ref.read(languageProvider.notifier).translate(key);
 
     return SingleChildScrollView(
@@ -460,207 +513,8 @@ Widget _buildResultPlaceholder() {
     );
   }
 
-  Widget _buildResultContent(YieldPrediction result) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildResultHeader(result),
-          const SizedBox(height: 32),
-          YieldChartWidget(dailyForecast: result.dailyForecast),
-          const SizedBox(height: 32),
-          _buildFinancialSection(result),
-          const SizedBox(height: 32),
-          _buildContextualInsights(result.contextualInsights),
-          const SizedBox(height: 32),
-          _buildFactorsCard(result),
-          const SizedBox(height: 24),
-          _buildRecommendationsCard(result),
-        ],
-      ).animate().fadeIn(duration: 800.ms),
-    );
-  }
+  // Removed redundant _buildResultContent and sub-methods as they are now in YieldResultView
 
-  Widget _buildResultHeader(YieldPrediction result) {
-    final languageNotifier = ref.read(languageProvider.notifier);
-    return Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                languageNotifier.translate('estimated_yield'),
-                style: GoogleFonts.outfit(
-                  color: ColorPalette.textSecondary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.2,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  Text(
-                    "${result.expectedYield}",
-                    style: GoogleFonts.outfit(
-                      fontSize: 48,
-                      fontWeight: FontWeight.bold,
-                      color: ColorPalette.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    "Qtl/Acre",
-                    style: GoogleFonts.outfit(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: ColorPalette.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        // Confidence Score Widget (Circular)
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF7F9FB),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Row(
-            children: [
-              Stack(
-                alignment: Alignment.center,
-                children: [
-                  SizedBox(
-                    width: 50,
-                    height: 50,
-                    child: CircularProgressIndicator(
-                      value: result.confidence / 100,
-                      strokeWidth: 6,
-                      backgroundColor: Colors.grey.shade200,
-                      valueColor: const AlwaysStoppedAnimation<Color>(ColorPalette.emeraldGreen),
-                    ),
-                  ),
-                  Text(
-                    "${result.confidence.toInt()}%",
-                    style: GoogleFonts.outfit(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: ColorPalette.textPrimary,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(width: 16),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "CONFIDENCE SCORE",
-                    style: GoogleFonts.outfit(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: ColorPalette.textSecondary,
-                    ),
-                  ),
-                  Text(
-                    "\"${languageNotifier.translate('high_reliability')}\"",
-                    style: GoogleFonts.outfit(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      fontStyle: FontStyle.italic,
-                      color: ColorPalette.textPrimary,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildFactorsCard(YieldPrediction result) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          ref.read(languageProvider.notifier).translate('core_factors'),
-          style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: ColorPalette.textPrimary),
-        ),
-        const SizedBox(height: 16),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: result.primaryFactors.map<Widget>((factor) {
-            return Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: ColorPalette.emeraldGreen.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: ColorPalette.emeraldGreen.withOpacity(0.15)),
-              ),
-              child: Text(
-                factor,
-                style: GoogleFonts.outfit(color: ColorPalette.emeraldGreen, fontSize: 12, fontWeight: FontWeight.w500),
-              ),
-            );
-          }).toList(),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildRecommendationsCard(YieldPrediction result) {
-    return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            ref.read(languageProvider.notifier).translate('ai_strategy'),
-            style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: ColorPalette.textPrimary),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: ColorPalette.offWhite,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey.shade200),
-            ),
-            child: Column(
-              children: result.recommendations.map<Widget>((rec) => Padding(
-                padding: const EdgeInsets.only(bottom: 12.0),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(Icons.check_circle_outline_rounded, color: ColorPalette.emeraldGreen, size: 18),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        rec, 
-                        style: GoogleFonts.outfit(
-                          color: ColorPalette.textPrimary,
-                          fontSize: 14,
-                          height: 1.4,
-                        )
-                      )
-                    ),
-                  ],
-                ),
-                )).toList(),
-              ),
-            ),
-          ],
-        );
-  }
 
   Widget _buildLabel(String text) {
     return Padding(
@@ -752,141 +606,10 @@ Widget _buildResultPlaceholder() {
     );
   }
 
-  Widget _buildContextualInsights(List<InsightCard> insights) {
-    if (insights.isEmpty) return const SizedBox();
-    
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          ref.read(languageProvider.notifier).translate('contextual_insights'),
-          style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: ColorPalette.textPrimary),
-        ),
-        const SizedBox(height: 16),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final cardWidth = (constraints.maxWidth - (3 * 16)) / 4;
-            return Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: insights.map((insight) => _ContextualInsightCard(
-                insight: insight,
-                width: cardWidth,
-              )).toList(),
-            );
-          }
-        ),
-      ],
-    );
-  }
+  // Contextual insights moved to YieldResultView
 
-  Widget _buildFinancialSection(YieldPrediction result) {
-    // 1. Get Financial Data for the crop (Mock)
-    final financialData = MarketDataService.getFinancialData(ref.read(yieldProvider).cropName);
-    
-    // 2. Calculate Metrics
-    final metrics = FinancialCalculator.calculateMetrics(
-      predictedYieldPerAcre: result.expectedYield,
-      fieldAreaAcres: ref.read(yieldProvider).fieldArea,
-      marketPricePerQuintal: financialData.marketPricePerQuintal,
-      costPerAcre: financialData.cultivationCostPerAcre,
-    );
 
-    // 3. Render Widget
-    return FinancialOutlookWidget(metrics: metrics, cropName: ref.read(yieldProvider).cropName);
-  }
-}
+  // Financial section moved to YieldResultView
 
-class _ContextualInsightCard extends StatelessWidget {
-  final InsightCard insight;
-  final double width;
-
-  const _ContextualInsightCard({required this.insight, required this.width});
-
-  @override
-  Widget build(BuildContext context) {
-    final languageNotifier = ProviderScope.containerOf(context).read(languageProvider.notifier);
-    
-    Color statusColor;
-    IconData icon;
-    
-    switch (insight.status.toLowerCase()) {
-      case 'optimal':
-      case 'good':
-        statusColor = const Color(0xFF4CAF50);
-        break;
-      case 'warning':
-        statusColor = const Color(0xFFFF9800);
-        break;
-      case 'monitor':
-        statusColor = const Color(0xFF2196F3);
-        break;
-      default:
-        statusColor = ColorPalette.textSecondary;
-    }
-
-    switch (insight.iconType.toLowerCase()) {
-      case 'thermometer':
-        icon = Icons.thermostat_rounded;
-        break;
-      case 'droplet':
-        icon = Icons.water_drop_rounded;
-        break;
-      case 'warning':
-        icon = Icons.report_problem_rounded;
-        break;
-      case 'sun':
-        icon = Icons.wb_sunny_rounded;
-        break;
-      default:
-        icon = Icons.info_outline_rounded;
-    }
-
-    return Container(
-      width: width,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade100),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Icon(icon, color: ColorPalette.emeraldGreen, size: 20),
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            languageNotifier.translate(insight.label.toLowerCase().replaceAll(' ', '_')),
-            style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: ColorPalette.textSecondary),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            insight.value,
-            style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: ColorPalette.textPrimary),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            languageNotifier.translate(insight.status.toLowerCase()),
-            style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w600, color: statusColor),
-          ),
-        ],
-      ),
-    );
-  }
+  // Historical methods moved to YieldResultView
 }

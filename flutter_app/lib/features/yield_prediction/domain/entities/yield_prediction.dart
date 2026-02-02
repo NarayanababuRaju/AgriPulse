@@ -1,5 +1,12 @@
 import 'package:equatable/equatable.dart';
 
+double _parseDouble(dynamic value) {
+  if (value == null) return 0.0;
+  if (value is num) return value.toDouble();
+  if (value is String) return double.tryParse(value) ?? 0.0;
+  return 0.0;
+}
+
 class DailyForecast extends Equatable {
   final String day;
   final double temp;
@@ -15,10 +22,10 @@ class DailyForecast extends Equatable {
 
   factory DailyForecast.fromJson(Map<String, dynamic> json) {
     return DailyForecast(
-      day: json['day'] ?? '',
-      temp: (json['temp'] ?? 0.0).toDouble(),
-      condition: json['condition'] ?? '',
-      yieldPotential: (json['yield_potential'] ?? 0.0).toDouble(),
+      day: json['day']?.toString() ?? '',
+      temp: _parseDouble(json['temp']),
+      condition: json['condition']?.toString() ?? '',
+      yieldPotential: _parseDouble(json['yield_potential']),
     );
   }
 
@@ -41,10 +48,10 @@ class InsightCard extends Equatable {
 
   factory InsightCard.fromJson(Map<String, dynamic> json) {
     return InsightCard(
-      label: json['label'] ?? '',
-      value: json['value'] ?? '',
-      status: json['status'] ?? '',
-      iconType: json['icon_type'] ?? '',
+      label: json['label']?.toString() ?? '',
+      value: json['value']?.toString() ?? '',
+      status: json['status']?.toString() ?? '',
+      iconType: json['icon_type']?.toString() ?? '',
     );
   }
 
@@ -78,15 +85,15 @@ class YieldPrediction extends Equatable {
   factory YieldPrediction.fromJson(String id, Map<String, dynamic> json) {
     return YieldPrediction(
       id: id,
-      expectedYield: (json['expected_yield'] ?? 0.0).toDouble(),
-      confidence: (json['confidence'] ?? 0.0).toDouble(),
-      primaryFactors: List<String>.from(json['factors'] ?? []),
-      recommendations: List<String>.from(json['recommendations'] ?? []),
+      expectedYield: _parseDouble(json['expected_yield']),
+      confidence: _parseDouble(json['confidence']),
+      primaryFactors: (json['factors'] as List?)?.map((e) => e.toString()).toList() ?? [],
+      recommendations: (json['recommendations'] as List?)?.map((e) => e.toString()).toList() ?? [],
       dailyForecast: (json['daily_forecast'] as List? ?? [])
-          .map((item) => DailyForecast.fromJson(item))
+          .map((item) => DailyForecast.fromJson(item as Map<String, dynamic>? ?? {}))
           .toList(),
       contextualInsights: (json['contextual_insights'] as List? ?? [])
-          .map((item) => InsightCard.fromJson(item))
+          .map((item) => InsightCard.fromJson(item as Map<String, dynamic>? ?? {}))
           .toList(),
       predictionDate: DateTime.now(),
       rawAiResponse: json,
