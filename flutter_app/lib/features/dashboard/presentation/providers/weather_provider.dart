@@ -1,5 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/api/agri_pulse_service.dart';
+import '../../../../core/services/local_vault.dart';
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
 
 // State class for Weather
 class WeatherState {
@@ -38,12 +41,26 @@ class WeatherNotifier extends StateNotifier<WeatherState> {
   }
 
   Future<void> fetchWeather({Coordinates coords = defaultLocation}) async {
+    final locationKey = "${coords.lat}_${coords.lon}";
     state = WeatherState.loading();
+
     try {
       final data = await _service.getCurrentWeather(coords.lat, coords.lon);
+      
+      // Cache success result
+      await LocalVault().cacheWeather(locationKey, jsonEncode(data));
+      
       state = WeatherState.success(data);
     } catch (e) {
-      state = WeatherState.error(e.toString());
+      debugPrint("❌ Weather API failed: $e. Using cache...");
+      
+      // Fallback to cache
+      final cached = LocalVault().getCachedWeather(locationKey);
+      if (cached != null) {
+        state = WeatherState.success(jsonDecode(cached.jsonData));
+      } else {
+        state = WeatherState.error("No network & no cached data.");
+      }
     }
   }
 }
