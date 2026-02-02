@@ -158,3 +158,41 @@ async def predict_yield(
     except Exception as e:
         logger.error(f"Yield prediction endpoint failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+class RefinementRequest(BaseModel):
+    farmer_id: str
+    original_diagnosis: Dict[str, Any]
+    farmer_feedback: str
+    context_overrides: Dict[str, Any] = {}
+    language: Optional[str] = None
+
+
+@router.post("/refine")
+async def refine_diagnosis(request: RefinementRequest):
+    """
+    Refine a diagnosis based on farmer feedback (Conversation Loop)
+    """
+    try:
+        logger.debug(f"Refining diagnosis for farmer: {request.farmer_id}")
+        logger.debug(f"Feedback: {request.farmer_feedback}")
+        
+        result = await gemini_service.refine_diagnosis_with_context(
+            original_diagnosis=request.original_diagnosis,
+            farmer_feedback=request.farmer_feedback,
+            context_overrides=request.context_overrides,
+            language=request.language
+        )
+        
+        if result["status"] == "error":
+            raise HTTPException(status_code=500, detail=result["error"])
+            
+        # Log the interaction (could save to DB as a 'refinement' event)
+        # db_service.save_refinement(...) 
+        
+        return {
+            "status": "success",
+            "result": result["refinement"],
+            "model": result["model_used"]
+        }
+    except Exception as e:
+        logger.error(f"Refinement endpoint failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))

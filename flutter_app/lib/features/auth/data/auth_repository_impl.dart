@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter_app/features/auth/domain/auth_repository.dart';
 import 'package:flutter_app/features/auth/domain/entities/farmer.dart';
+import 'package:flutter_app/core/services/local_vault.dart';
 
 class AuthRepositoryImpl implements AuthRepository {
   // Mock storage for signed-in user
@@ -26,13 +27,23 @@ class AuthRepositoryImpl implements AuthRepository {
 
     // Simple mock validation: "123456" is the magic code
     if (smsCode == "123456") {
-      _currentUser = const Farmer(
+      final user = const Farmer(
         id: "farmer_1",
         phoneNumber: "+919535054466", // Mock
         name: "Raju", // Mock Name
-        language: "ta", // Default to Tamil
+        language: "en", // Default to English
       );
-      return _currentUser!;
+      
+      // Persist user
+      await LocalVault().saveUser({
+        'id': user.id,
+        'phoneNumber': user.phoneNumber,
+        'name': user.name,
+        'language': user.language,
+      });
+
+      _currentUser = user;
+      return user;
     } else {
       throw Exception("Invalid OTP");
     }
@@ -41,11 +52,24 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<void> logout() async {
     await Future.delayed(const Duration(milliseconds: 500));
+    await LocalVault().clearUser();
     _currentUser = null;
   }
 
   @override
   Future<Farmer?> getCurrentUser() async {
+    if (_currentUser != null) return _currentUser;
+    
+    final userData = LocalVault().getUser();
+    if (userData != null) {
+      _currentUser = Farmer(
+        id: userData['id'],
+        phoneNumber: userData['phoneNumber'],
+        name: userData['name'],
+        language: userData['language'],
+      );
+    }
+    
     return _currentUser;
   }
 }

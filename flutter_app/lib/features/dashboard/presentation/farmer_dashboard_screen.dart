@@ -11,6 +11,7 @@ import 'providers/weather_provider.dart'; // Import Weather Provider
 import 'widgets/weather_card.dart';
 import 'widgets/action_card.dart';
 import 'widgets/recent_activity_list.dart';
+import 'package:flutter_app/core/widgets/offline_banner.dart';
 import '../../yield_prediction/providers/language_provider.dart';
 
 /// FarmerDashboardScreen - The main home screen for the farmer
@@ -48,6 +49,8 @@ class FarmerDashboardScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                const OfflineBanner(),
+                const SizedBox(height: 12),
                 // ... (Header) ...
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,

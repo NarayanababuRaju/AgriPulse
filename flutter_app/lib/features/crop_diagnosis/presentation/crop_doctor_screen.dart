@@ -12,6 +12,7 @@ import '../../../core/theme/color_palette.dart';
 import '../../../core/utils/error_handler.dart';
 import '../providers/diagnosis_provider.dart';
 import 'widgets/diagnosis_report_dialog.dart';
+import 'widgets/diagnosis_feedback_widget.dart';
 import '../../yield_prediction/providers/language_provider.dart';
 
 /// Crop Doctor Screen
@@ -547,6 +548,16 @@ class _CropDoctorScreenState extends ConsumerState<CropDoctorScreen> {
     final disease = result['disease_name']?.toString() ?? "Unknown Issue"; // Adapted to likely API key
     final confidence = (result['confidence_score'] is num) ? result['confidence_score'] : 0.85;
     final treatment = result['treatment_recommendation']?.toString() ?? "Consult an expert.";
+    
+    // Detect if plant is healthy (no disease found)
+    final bool isHealthy = disease.toLowerCase().contains('healthy') || 
+                           disease.toLowerCase().contains('no visible disease') ||
+                           disease.toLowerCase().contains('no disease');
+    
+    // Context-aware colors and icons
+    final Color statusColor = isHealthy ? ColorPalette.emeraldGreen : ColorPalette.rustRed;
+    final IconData statusIcon = isHealthy ? Icons.check_circle_outline_rounded : Icons.warning_amber_rounded;
+    final String statusLabel = isHealthy ? tr('healthy_plant') : tr('detected_issue');
 
     return SingleChildScrollView(
       child: Column(
@@ -558,10 +569,10 @@ class _CropDoctorScreenState extends ConsumerState<CropDoctorScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: ColorPalette.rustRed.withValues(alpha: 0.1),
+                  color: statusColor.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.warning_amber_rounded, color: ColorPalette.rustRed, size: 32),
+                child: Icon(statusIcon, color: statusColor, size: 32),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -569,15 +580,15 @@ class _CropDoctorScreenState extends ConsumerState<CropDoctorScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      tr('detected_issue'),
+                      statusLabel,
                       style: const TextStyle(color: Colors.grey, fontSize: 12),
                     ),
                     Text(
                       disease,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
-                        color: ColorPalette.rustRed,
+                        color: statusColor,
                       ),
                     ),
                   ],
@@ -714,6 +725,11 @@ class _CropDoctorScreenState extends ConsumerState<CropDoctorScreen> {
               ),
             ),
           ),
+          
+          const SizedBox(height: 16),
+          
+          // CONVERSATIONAL FEEDBACK
+          const DiagnosisFeedbackWidget(),
         ],
       ),
     ).animate().fadeIn(duration: 400.ms, curve: Curves.easeOut);

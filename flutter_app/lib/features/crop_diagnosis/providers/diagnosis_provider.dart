@@ -5,6 +5,8 @@ import 'package:flutter_app/core/api/agri_pulse_service.dart';
 import 'package:flutter_app/features/auth/providers/auth_provider.dart';
 import 'package:flutter_app/features/dashboard/presentation/providers/weather_provider.dart';
 import 'package:flutter/foundation.dart'; // For debugPrint
+import '../../../core/services/local_vault.dart';
+import '../models/diagnosis_record.dart';
 
 /// Diagnosis State
 /// 
@@ -113,6 +115,20 @@ class DiagnosisController extends StateNotifier<DiagnosisState> {
         weatherContext: weatherContext,
       );
       
+      final record = DiagnosisRecord(
+        id: result['analysis_id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
+        imagePath: state.imageFile!.path,
+        diseaseName: result['disease_name'] ?? 'Unknown',
+        confidence: (result['confidence_score'] ?? 0.0).toDouble(),
+        treatmentSummary: result['treatment_recommendation'] ?? '',
+        timestamp: DateTime.now(),
+        farmerInput: state.description,
+        refinementReasoning: result['refinement_reasoning'], // available if refined
+        treatmentAdjustment: result['treatment_adjustment'],
+      );
+      
+      await LocalVault().saveDiagnosis(record);
+
       state = state.copyWith(
         isAnalyzing: false,
         diagnosisResult: result,
@@ -166,7 +182,8 @@ PREVENTION_END
       
       final newDisease = diseaseMatch?.group(1)?.trim() ?? disease;
       final newTreatment = treatmentMatch?.group(1)?.trim() ?? treatment;
-      final newPrevention = preventionMatch?.group(1)?.trim()?.split(' . ') ?? (currentResult['prevention'] as List?);
+      final preventionText = preventionMatch?.group(1)?.trim();
+      final newPrevention = preventionText != null ? preventionText.split(' . ') : (currentResult['prevention'] as List?);
 
       final newResult = Map<String, dynamic>.from(currentResult);
       newResult['disease_name'] = newDisease;
@@ -177,6 +194,71 @@ PREVENTION_END
     } catch (e) {
       debugPrint("Diagnosis Translation Error: $e");
       state = state.copyWith(isAnalyzing: false);
+    }
+  }
+
+  /// Refine the diagnosis based on user feedback
+  Future<void> refineDiagnosis(String feedback, Map<String, dynamic> overrides) async {
+    if (state.diagnosisResult == null) return;
+    
+    state = state.copyWith(isAnalyzing: true, errorMessage: null);
+
+    try {
+      final authState = _ref.read(authStateProvider);
+      final String languageCode = authState.value?.language ?? 'en-IN';
+
+      final result = await _apiService.refineDiagnosis(
+        farmerId: "demo-farmer-123",
+        originalDiagnosis: state.diagnosisResult!,
+        feedback: feedback,
+        contextOverrides: overrides,
+        language: languageCode,
+      );
+
+      final refinementData = result['result'];
+      
+      // Merge refinement into existing result to preserve UI structure
+      final currentResult = Map<String, dynamic>.from(state.diagnosisResult!);
+      
+      if (refinementData['is_revised'] == true) {
+        currentResult['disease_name'] = refinementData['revised_diagnosis'];
+        currentResult['confidence_score'] = refinementData['confidence_score'];
+      }
+      
+      // Always add reasoning and adjustment
+      currentResult['refinement_reasoning'] = refinementData['reasoning'];
+      currentResult['treatment_adjustment'] = refinementData['treatment_adjustment'];
+      
+      // If there's a treatment adjustment, append it to recommendation
+      if (refinementData['treatment_adjustment'] != null && 
+          refinementData['treatment_adjustment'].toString().isNotEmpty) {
+        String currentTreat = currentResult['treatment_recommendation'] ?? "";
+        currentResult['treatment_recommendation'] = "$currentTreat\n\n[Adjustment]: ${refinementData['treatment_adjustment']}";
+      }
+
+      // Save refined record to history
+      final record = DiagnosisRecord(
+        id: currentResult['analysis_id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
+        imagePath: state.imageFile!.path,
+        diseaseName: currentResult['disease_name'] ?? 'Unknown',
+        confidence: (currentResult['confidence_score'] ?? 0.0).toDouble(),
+        treatmentSummary: currentResult['treatment_recommendation'] ?? '',
+        timestamp: DateTime.now(),
+        farmerInput: feedback,
+        refinementReasoning: currentResult['refinement_reasoning'],
+        treatmentAdjustment: refinementData['treatment_adjustment'],
+      );
+      await LocalVault().saveDiagnosis(record);
+
+      state = state.copyWith(
+        isAnalyzing: false,
+        diagnosisResult: currentResult,
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isAnalyzing: false,
+        errorMessage: "Refinement failed: ${e.toString()}",
+      );
     }
   }
 
@@ -249,4 +331,11 @@ PREVENTION_END
 final diagnosisProvider = StateNotifierProvider.autoDispose<DiagnosisController, DiagnosisState>((ref) {
   final apiService = ref.watch(agriPulseServiceProvider);
   return DiagnosisController(apiService, ref);
+});
+
+/// Provider for Local History (Offline Capable)
+final diagnosisHistoryProvider = FutureProvider.autoDispose<List<DiagnosisRecord>>((ref) async {
+  // Since Hive is synchronous for reads, we can just return the list.
+  // Using FutureProvider allows for loading states if we were to move to async storage later.
+  return LocalVault().getHistory();
 });

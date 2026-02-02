@@ -128,6 +128,67 @@ Format your response as JSON with these exact keys:
             return {"status": "error", "error": str(e)}
 
     # =========================================================================
+    # CONVERSATIONAL REFINEMENT (Experience-Led AI)
+    # =========================================================================
+    async def refine_diagnosis_with_context(
+        self,
+        original_diagnosis: Dict[str, Any],
+        farmer_feedback: str,
+        context_overrides: Dict[str, Any],
+        language: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Refine a diagnosis based on the farmer's ground-truth observations.
+        Uses Gemini 3.0 Pro for reasoning.
+        """
+        try:
+            prompt = f"""You are a humble, expert agricultural advisor. A farmer is challenging your previous diagnosis based on their on-ground experience.
+            
+YOUR GOAL:
+Review your 'Original Diagnosis' against the 'New Evidence'. 
+- If the new evidence (e.g., 'heavy rain', 'sandy soil') strongly contradicts your visual analysis, YOU MUST REVISE your diagnosis.
+- Trust the farmer's observation of environmental conditions over your visual inference if there is a conflict.
+- If the evidence supports a different disease, switch the diagnosis.
+- If the evidence is irrelevant, gently explain why the original diagnosis stands.
+
+Original Diagnosis:
+{original_diagnosis}
+
+New Evidence (Farmer's Feedback):
+"{farmer_feedback}"
+
+Context Overrides (Ground Truth):
+{context_overrides}
+"""
+            if language:
+                 prompt += f"\nLANGUAGE INSTRUCTIONS:\nThe farmer's language is {language}. You MUST translate the CONTENT of 'revised_diagnosis', 'reasoning', and 'treatment_adjustment' into {language}.\nCRITICAL: Do NOT translate the JSON keys. Keep them exactly as 'revised_diagnosis', 'reasoning', etc.\n"
+
+            prompt += """
+Provide your response as a valid JSON object with these EXACT keys:
+- is_revised: boolean (true if you changed the diagnosis).
+- revised_diagnosis: The name of the disease (new or original).
+- confidence_score: Your new confidence score (0-1).
+- reasoning: A polite explanation of why you changed (or kept) the diagnosis, acknowledging the farmer's input.
+- treatment_adjustment: Any changes to the treatment plan based on the new context (e.g., "Avoid watering due to rain").
+"""
+
+            response = self.model_30_pro.generate_content(
+                prompt,
+                generation_config={"response_mime_type": "application/json"}
+            )
+            
+            import json
+            refinement_data = json.loads(response.text)
+            return {
+                "status": "success",
+                "refinement": refinement_data,
+                "model_used": "gemini-3.0-pro"
+            }
+        except Exception as e:
+            logger.error(f"Refinement failed: {str(e)}")
+            return {"status": "error", "error": str(e)}
+
+    # =========================================================================
     # YIELD PREDICTION
     # =========================================================================
     async def predict_yield(

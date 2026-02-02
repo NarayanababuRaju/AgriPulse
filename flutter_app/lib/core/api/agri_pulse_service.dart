@@ -181,6 +181,36 @@ class AgriPulseService {
       throw Exception("Translation failed: $e");
     }
   }
+
+  /// Refine Diagnosis (Conversational)
+  ///
+  /// Sends farmer's feedback and context to re-evaluate diagnosis.
+  Future<Map<String, dynamic>> refineDiagnosis({
+    required String farmerId,
+    required Map<String, dynamic> originalDiagnosis,
+    required String feedback,
+    required Map<String, dynamic> contextOverrides,
+    String? language,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '/api/crop/refine',
+        data: {
+          "farmer_id": farmerId,
+          "original_diagnosis": originalDiagnosis,
+          "farmer_feedback": feedback,
+          "context_overrides": contextOverrides,
+          "language": language,
+        },
+      );
+      return response.data;
+    } catch (e) {
+      if (e is DioException) {
+        throw Exception("Refinement failed: ${e.message}");
+      }
+      throw Exception("Refinement failed: $e");
+    }
+  }
 }
 
 final agriPulseServiceProvider = Provider<AgriPulseService>((ref) {
