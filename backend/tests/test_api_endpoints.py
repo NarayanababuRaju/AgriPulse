@@ -137,42 +137,7 @@ class TestYieldPredictionEndpoint:
         assert response.status_code == 422
 
 
-class TestWeatherEndpoints:
-    """Test weather service endpoints"""
-    
-    def test_get_current_weather(self):
-        """Test fetching current weather"""
-        response = client.get(
-            "/api/weather/current",
-            params={"lat": 12.9716, "lon": 77.5946}
-        )
-        
-        assert response.status_code == 200
-        data = response.json()
-        assert "temperature" in data
-        assert "condition" in data
-        assert "location" in data
-    
-    def test_get_weather_forecast(self):
-        """Test fetching weather forecast"""
-        response = client.get(
-            "/api/weather/forecast",
-            params={"lat": 12.9716, "lon": 77.5946}
-        )
-        
-        assert response.status_code == 200
-        data = response.json()
-        assert "daily_summary" in data
-        assert isinstance(data["daily_summary"], list)
-    
-    def test_weather_invalid_coordinates(self):
-        """Test weather with invalid coordinates"""
-        response = client.get(
-            "/api/weather/current",
-            params={"lat": 999, "lon": 999}
-        )
-        # Should still return data (mock or error handling)
-        assert response.status_code in [200, 400, 500]
+
 
 
 class TestSpeechEndpoints:
@@ -243,6 +208,69 @@ class TestFeedbackEndpoint:
             }
         )
         assert response.status_code == 422
+
+
+class TestTranslationEndpoint:
+    """Test translation utility endpoint"""
+
+    def test_translate_text_success(self):
+        """Test successful text translation"""
+        response = client.post(
+            "/api/utils/translate",
+            data={
+                "text": "Hello World",
+                "target_language": "ta"
+            }
+        )
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert "translation" in data
+        # Note: We can't easily verify the exact translation content without mocking,
+        # but we can check the struct.
+
+
+class TestWeatherEndpoints:
+    """Test weather service endpoints"""
+    
+    def test_get_current_weather(self):
+        """Test fetching current weather"""
+        response = client.get(
+            "/api/weather/current",
+            params={"lat": 12.9716, "lon": 77.5946}
+        )
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert "temperature" in data
+        assert "condition" in data
+        assert "location" in data
+    
+    def test_get_weather_forecast_7_days(self):
+        """Test fetching weather forecast checks for 7 days (extrapolation)"""
+        response = client.get(
+            "/api/weather/forecast",
+            params={"lat": 12.9716, "lon": 77.5946}
+        )
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert "daily_summary" in data
+        summary = data["daily_summary"]
+        assert isinstance(summary, list)
+        
+        # CRITICAL: Verify we have 7 days of data (5 real + 2 extrapolated)
+        assert len(summary) >= 7, f"Expected 7 days of forecast, got {len(summary)}"
+    
+    def test_weather_invalid_coordinates(self):
+        """Test weather with invalid coordinates"""
+        response = client.get(
+            "/api/weather/current",
+            params={"lat": 999, "lon": 999}
+        )
+        # Should still return data (mock or error handling)
+        assert response.status_code in [200, 400, 500]
 
 
 if __name__ == "__main__":
