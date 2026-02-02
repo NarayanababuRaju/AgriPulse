@@ -4,7 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// API Client Provider
 final apiClientProvider = Provider<Dio>((ref) {
   final dio = Dio(BaseOptions(
-    baseUrl: 'http://localhost:8080', // Update with Cloud Run URL for production
+    // Update with Cloud Run URL for production
+    baseUrl: 'http://localhost:8000', // Right now, it matches local backend port
     connectTimeout: const Duration(seconds: 10),
     receiveTimeout: const Duration(seconds: 30),
     headers: {
