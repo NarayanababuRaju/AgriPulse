@@ -30,6 +30,8 @@ class GeminiService:
         self,
         image_data: bytes,
         voice_transcription: str,
+        acreage: float = 1.0,
+        soil_type: str = "Unknown",
         weather_context: Optional[Dict[str, Any]] = None,
         language: Optional[str] = None
     ) -> Dict[str, Any]:
@@ -37,8 +39,12 @@ class GeminiService:
         try:
             prompt = f"""You are an expert agricultural advisor for Indian farmers. 
 Analyze the crop image and the farmer's description to provide a precise diagnosis.
+Provide advice that is specifically grounded in the following plot metadata:
 
-Farmer's Description: {voice_transcription}
+PLOT METADATA:
+- Scale: {acreage} acres
+- Soil Environment: {soil_type}
+- Farmer Input: {voice_transcription}
 """
             if language:
                 logger.debug(f"Generating crop diagnosis in language: {language}")
@@ -50,9 +56,13 @@ Farmer's Description: {voice_transcription}
 - disease_name: The name of the disease or pest identified.
 - confidence_score: A float between 0 and 1 representing your confidence.
 - severity: 'Low', 'Medium', or 'High'.
-- treatment_recommendation: A comprehensive guide including both organic and chemical options.
-- prevention: A list of preventive steps.
+- treatment_recommendation: Detailed instructions scaled for {acreage} acres on {soil_type}.
+- prevention: A list of preventive steps specific to {soil_type} constraints.
 - recovery_time: Estimated days to recovery.
+
+CRITICAL PRECISION:
+- All chemical or organic quantities MUST be calculated and stated for a {acreage} acre plot.
+- Recommendations must account for the drainage and nutrient properties of {soil_type} soil.
 """
             
             logger.debug(f"Calling Gemini with prompt: {prompt[:500]}...")
@@ -70,7 +80,7 @@ Farmer's Description: {voice_transcription}
             )
             
             logger.debug(f"Gemini response received: {response.text[:200]}...")
-            analysis_data = json.loads(response.text)
+            analysis_data = self._parse_json(response.text)
             return {
                 "status": "success",
                 "analysis": analysis_data,
@@ -135,6 +145,7 @@ Format your response as JSON with these exact keys:
         original_diagnosis: Dict[str, Any],
         farmer_feedback: str,
         context_overrides: Dict[str, Any],
+        interaction_history: Optional[list[Dict[str, Any]]] = None,
         language: Optional[str] = None
     ) -> Dict[str, Any]:
         """
@@ -142,26 +153,37 @@ Format your response as JSON with these exact keys:
         Uses Gemini 3.0 Pro for reasoning.
         """
         try:
-            prompt = f"""You are a humble, expert agricultural advisor. A farmer is challenging your previous diagnosis based on their on-ground experience.
+            # Build Interaction Thread
+            history_text = ""
+            if interaction_history:
+                history_text = "\\n\\nPREVIOUS INTERACTION THREAD:\\n"
+                for item in interaction_history:
+                    role = item.get('role', 'unknown').upper()
+                    content = item.get('content', '')
+                    history_text += f"[{role}]: {content}\\n"
+            
+            prompt = f"""You are a humble, expert agricultural advisor. A farmer is engaging in a conversation to refine your diagnosis.
             
 YOUR GOAL:
-Review your 'Original Diagnosis' against the 'New Evidence'. 
-- If the new evidence (e.g., 'heavy rain', 'sandy soil') strongly contradicts your visual analysis, YOU MUST REVISE your diagnosis.
-- Trust the farmer's observation of environmental conditions over your visual inference if there is a conflict.
-- If the evidence supports a different disease, switch the diagnosis.
+Review the 'Original Diagnosis' and the 'Interaction Thread'. 
+- Use the thread to understand the evolving context.
+- If the new evidence (e.g., 'heavy rain', 'sandy soil') in the thread contradicts your visual analysis, YOU MUST REVISE your diagnosis.
+- Trust the farmer's ground-truth observations over your visual inference.
 - If the evidence is irrelevant, gently explain why the original diagnosis stands.
 
 Original Diagnosis:
 {original_diagnosis}
 
-New Evidence (Farmer's Feedback):
+{history_text}
+
+Latest Feedback (New Evidence):
 "{farmer_feedback}"
 
 Context Overrides (Ground Truth):
 {context_overrides}
 """
             if language:
-                 prompt += f"\nLANGUAGE INSTRUCTIONS:\nThe farmer's language is {language}. You MUST translate the CONTENT of 'revised_diagnosis', 'reasoning', and 'treatment_adjustment' into {language}.\nCRITICAL: Do NOT translate the JSON keys. Keep them exactly as 'revised_diagnosis', 'reasoning', etc.\n"
+                 prompt += f"\\nLANGUAGE INSTRUCTIONS:\\nThe farmer's language is {language}. You MUST translate the CONTENT of 'revised_diagnosis', 'reasoning', and 'treatment_adjustment' into {language}.\\nCRITICAL: Do NOT translate the JSON keys. Keep them exactly as 'revised_diagnosis', 'reasoning', etc.\\n"
 
             prompt += """
 Provide your response as a valid JSON object with these EXACT keys:
@@ -177,8 +199,7 @@ Provide your response as a valid JSON object with these EXACT keys:
                 generation_config={"response_mime_type": "application/json"}
             )
             
-            import json
-            refinement_data = json.loads(response.text)
+            refinement_data = self._parse_json(response.text)
             return {
                 "status": "success",
                 "refinement": refinement_data,
@@ -235,16 +256,23 @@ Return your response as a valid JSON object.
                 prompt += f"Historical Yield Data:\n{historical_data}\n\n"
             
             import json
+            import time
+            start_time = time.time()
+            logger.debug(f"🚀 Starting Yield Prediction with Gemini 3 Pro...")
+            
             response = self.model_30_pro.generate_content(
                 prompt,
                 generation_config={"response_mime_type": "application/json"}
             )
             
-            prediction_data = json.loads(response.text)
+            duration = time.time() - start_time
+            logger.info(f"✅ Yield Prediction finished in {duration:.2f} seconds.")
+            
+            prediction_data = self._parse_json(response.text)
             return {
                 "status": "success",
                 "prediction": prediction_data,
-                "model_used": "gemini-3.0-pro"
+                "model_used": "gemini-1.5-pro"
             }
         except Exception as e:
             logger.error(f"1.5 Pro yield prediction failed: {str(e)}")
@@ -307,6 +335,28 @@ Return your response as a valid JSON object.
     # =========================================================================
     # UTILITIES
     # =========================================================================
+    def _parse_json(self, response_text: str) -> Dict[str, Any]:
+        """Robusly parse JSON from Gemini's response, stripping markdown backticks if present."""
+        try:
+            cleaned_text = response_text.strip()
+            if cleaned_text.startswith("```"):
+                # Handle ```json ... ``` or just ``` ... ```
+                if cleaned_text.startswith("```json"):
+                    cleaned_text = cleaned_text[7:]
+                else:
+                    cleaned_text = cleaned_text[3:]
+                
+                if cleaned_text.endswith("```"):
+                    cleaned_text = cleaned_text[:-3]
+                
+                cleaned_text = cleaned_text.strip()
+            
+            import json
+            return json.loads(cleaned_text)
+        except Exception as e:
+            logger.error(f"JSON Parsing failed: {str(e)} | Text: {response_text[:200]}")
+            raise ValueError(f"Failed to parse valid JSON from AI response: {str(e)}")
+
     async def translate_text(self, text: str, target_language: str) -> Dict[str, Any]:
         """Translate text using Gemini 1.5 Flash (Fast & Cheap)"""
         try:
