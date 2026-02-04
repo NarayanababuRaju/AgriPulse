@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_app/core/theme/color_palette.dart';
 import 'package:flutter_app/features/yield_prediction/presentation/widgets/mini_forecast_widget.dart';
-import 'package:flutter_app/features/yield_prediction/providers/language_provider.dart';
 
 class YieldHeaderCard extends ConsumerWidget {
   const YieldHeaderCard({super.key});
@@ -18,7 +17,7 @@ class YieldHeaderCard extends ConsumerWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.05),
+            color: Colors.grey.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -67,45 +66,7 @@ class YieldHeaderCard extends ConsumerWidget {
           const MiniForecastWidget(),
           
           const Spacer(),
-          
-          // Language Dropdown
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            decoration: BoxDecoration(
-              color: ColorPalette.offWhite,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.grey.shade200),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<AppLanguage>(
-                value: ref.watch(languageProvider),
-                icon: const Icon(Icons.language, size: 18, color: ColorPalette.emeraldGreen),
-                isDense: true,
-                style: GoogleFonts.outfit(
-                  fontSize: 13, 
-                  fontWeight: FontWeight.w600, 
-                  color: ColorPalette.textPrimary
-                ),
-                onChanged: (lang) {
-                  if (lang != null) {
-                    ref.read(languageProvider.notifier).setLanguage(lang);
-                  }
-                },
-                 items: AppLanguage.values.map((lang) {
-                  return DropdownMenuItem(
-                    value: lang,
-                    child: Text(
-                      lang == AppLanguage.en ? "English" : 
-                      lang == AppLanguage.hi ? "हिन्दी" :
-                      lang == AppLanguage.ta ? "தமிழ்" :
-                      lang == AppLanguage.kn ? "ಕನ್ನಡ" :
-                      lang == AppLanguage.te ? "తెలుగు" : "മലയാളം",
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-          ),
+        
         ],
       ),
     );

@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:intl/intl.dart';
 import '../../../../core/theme/color_palette.dart';
 import '../../domain/entities/yield_prediction.dart';
-import '../../providers/language_provider.dart';
+import 'package:flutter_app/core/localization/language_provider.dart';
 
 class YieldChartWidget extends ConsumerWidget {
   final List<DailyForecast> dailyForecast;
@@ -16,6 +17,8 @@ class YieldChartWidget extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Watch language state to trigger rebuilds on language change
+    ref.watch(languageProvider);
     final languageNotifier = ref.read(languageProvider.notifier);
     return Container(
       height: 320,
@@ -51,9 +54,10 @@ class YieldChartWidget extends ConsumerWidget {
                   touchTooltipData: BarTouchTooltipData(
                     tooltipBgColor: ColorPalette.textPrimary,
                     getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                      final day = dailyForecast[groupIndex];
+                      final dayData = dailyForecast[groupIndex];
+                      final dayLabel = _getDayLabel(groupIndex, languageNotifier);
                       return BarTooltipItem(
-                        "${day.day}: ${day.temp}°C\n${day.condition}\nPotential: ${day.yieldPotential.toInt()}%",
+                        "$dayLabel: ${dayData.temp}°C\n${dayData.condition}\nPotential: ${dayData.yieldPotential.toInt()}%",
                         GoogleFonts.outfit(color: Colors.white, fontSize: 11),
                       );
                     },
@@ -66,10 +70,11 @@ class YieldChartWidget extends ConsumerWidget {
                       showTitles: true,
                       getTitlesWidget: (value, meta) {
                         if (value < 0 || value >= dailyForecast.length) return const SizedBox();
+                        final dayLabel = _getDayLabel(value.toInt(), languageNotifier);
                         return Padding(
                           padding: const EdgeInsets.only(top: 8.0),
                           child: Text(
-                            dailyForecast[value.toInt()].day,
+                            dayLabel,
                             style: GoogleFonts.outfit(fontSize: 10, color: ColorPalette.textSecondary),
                           ),
                         );
@@ -143,5 +148,16 @@ class YieldChartWidget extends ConsumerWidget {
         Text(label, style: GoogleFonts.outfit(fontSize: 10, color: ColorPalette.textSecondary)),
       ],
     );
+  }
+
+  String _getDayLabel(int index, dynamic languageNotifier) {
+    final now = DateTime.now();
+    final targetDate = now.add(Duration(days: index));
+    
+    if (index == 0) return languageNotifier.translate('today');
+    if (index == 1) return languageNotifier.translate('tomorrow');
+    
+    // For other days, use the short weekday name
+    return DateFormat('EEE').format(targetDate);
   }
 }
