@@ -1,12 +1,17 @@
+import 'dart:convert';
 import 'package:image_picker/image_picker.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_app/core/api/agri_pulse_service.dart';
 import 'package:flutter_app/features/auth/providers/auth_provider.dart';
 import 'package:flutter_app/features/dashboard/presentation/providers/weather_provider.dart';
+import 'package:flutter_app/features/profile/providers/profile_provider.dart';
 import 'package:flutter/foundation.dart'; // For debugPrint
 import '../../../core/services/local_vault.dart';
 import '../models/diagnosis_record.dart';
+import '../models/thread_item.dart';
+import '../../../core/localization/language_provider.dart';
+import '../../../core/api/path_enforcer.dart';
 
 /// Diagnosis State
 /// 
@@ -19,6 +24,17 @@ class DiagnosisState {
   final bool isSynthesizing;
   final bool isAudioPlaying;
   final Map<String, dynamic>? diagnosisResult;
+  final String? irrigationStage;
+  final String? soilMoisture;
+  final String? weatherEvent;
+  final String? spreadPattern;
+  final String? lastTreatment;
+  final String? dosage;
+  final String? leafTexture;
+  final String? odorPresence;
+  final String? speedOfSpread;
+  final List<ThreadItem> conversationThread;
+  final String? activeRecordId;
 
   const DiagnosisState({
     this.imageFile,
@@ -28,6 +44,17 @@ class DiagnosisState {
     this.isAudioPlaying = false,
     this.errorMessage,
     this.diagnosisResult,
+    this.irrigationStage,
+    this.soilMoisture,
+    this.weatherEvent,
+    this.spreadPattern,
+    this.lastTreatment,
+    this.dosage,
+    this.leafTexture,
+    this.odorPresence,
+    this.speedOfSpread,
+    this.conversationThread = const [],
+    this.activeRecordId,
   });
 
   DiagnosisState copyWith({
@@ -38,6 +65,17 @@ class DiagnosisState {
     bool? isAudioPlaying,
     String? errorMessage,
     Map<String, dynamic>? diagnosisResult,
+    String? irrigationStage,
+    String? soilMoisture,
+    String? weatherEvent,
+    String? spreadPattern,
+    String? lastTreatment,
+    String? dosage,
+    String? leafTexture,
+    String? odorPresence,
+    String? speedOfSpread,
+    List<ThreadItem>? conversationThread,
+    String? activeRecordId,
   }) {
     return DiagnosisState(
       imageFile: imageFile ?? this.imageFile,
@@ -47,6 +85,17 @@ class DiagnosisState {
       isAudioPlaying: isAudioPlaying ?? this.isAudioPlaying,
       errorMessage: errorMessage ?? this.errorMessage,
       diagnosisResult: diagnosisResult ?? this.diagnosisResult,
+      irrigationStage: irrigationStage ?? this.irrigationStage,
+      soilMoisture: soilMoisture ?? this.soilMoisture,
+      weatherEvent: weatherEvent ?? this.weatherEvent,
+      spreadPattern: spreadPattern ?? this.spreadPattern,
+      lastTreatment: lastTreatment ?? this.lastTreatment,
+      dosage: dosage ?? this.dosage,
+      leafTexture: leafTexture ?? this.leafTexture,
+      odorPresence: odorPresence ?? this.odorPresence,
+      speedOfSpread: speedOfSpread ?? this.speedOfSpread,
+      conversationThread: conversationThread ?? this.conversationThread,
+      activeRecordId: activeRecordId ?? this.activeRecordId,
     );
   }
 }
@@ -75,11 +124,25 @@ class DiagnosisController extends StateNotifier<DiagnosisState> {
       );
 
       if (pickedFile != null) {
-        // Reset result when new image picked
+        XFile finalFile = pickedFile;
+        
+        // Web Persistence Fix: Convert to Base64 Data URI
+        // Hive cannot persist blob: URLs across refreshes
+        if (kIsWeb) {
+          final bytes = await pickedFile.readAsBytes();
+          final String base64Data = base64Encode(bytes);
+          final String mimeType = pickedFile.mimeType ?? 'image/jpeg';
+          final String dataUri = 'data:$mimeType;base64,$base64Data';
+          finalFile = XFile(dataUri, mimeType: mimeType);
+        }
+
+        // Reset result and record ID when new image picked
         state = state.copyWith(
-          imageFile: pickedFile, 
+          imageFile: finalFile, 
           errorMessage: null, 
-          diagnosisResult: null
+          diagnosisResult: null,
+          activeRecordId: null, 
+          conversationThread: [],
         );
       }
     } catch (e) {
@@ -87,10 +150,66 @@ class DiagnosisController extends StateNotifier<DiagnosisState> {
     }
   }
 
+  /// Load a record into the active state for refinement
+  void loadRecord(DiagnosisRecord record) {
+    // 1. Synthesize thread if missing (Legacy Support/Self-Healing)
+    List<ThreadItem> activeThread = record.thread ?? [];
+    if (activeThread.isEmpty) {
+      activeThread = [
+        ThreadItem(
+          role: 'user',
+          content: record.farmerInput ?? 'No initial description',
+          timestamp: record.timestamp,
+        ),
+        ThreadItem(
+          role: 'ai',
+          content: record.treatmentSummary,
+          timestamp: record.timestamp,
+          metadata: {
+            'disease_name': record.diseaseName,
+            'confidence_score': record.confidence,
+          }
+        )
+      ];
+    }
+    
+    state = state.copyWith(
+      activeRecordId: record.id,
+      imageFile: XFile(record.imagePath),
+      diagnosisResult: {
+        'disease_name': record.diseaseName,
+        'confidence_score': record.confidence,
+        'treatment_recommendation': record.treatmentSummary,
+        'refinement_reasoning': record.refinementReasoning,
+        'treatment_adjustment': record.treatmentAdjustment,
+        'initial_user_input': record.initialUserInput,
+        'initial_ai_response': record.initialAiResponse,
+      },
+      conversationThread: activeThread,
+      description: record.farmerInput,
+      irrigationStage: record.irrigationStage,
+      soilMoisture: record.soilMoisture,
+      weatherEvent: record.weatherEvent,
+      spreadPattern: record.spreadPattern,
+      lastTreatment: record.lastTreatment,
+      dosage: record.dosage,
+    );
+  }
+
   /// Update the farmer's description of the issue
   void setDescription(String text) {
     state = state.copyWith(description: text);
   }
+
+  void setIrrigationStage(String? value) => state = state.copyWith(irrigationStage: value);
+  void setSoilMoisture(String? value) => state = state.copyWith(soilMoisture: value);
+  void setWeatherEvent(String? value) => state = state.copyWith(weatherEvent: value);
+  void setSpreadPattern(String? value) => state = state.copyWith(spreadPattern: value);
+  void setLastTreatment(String? value) => state = state.copyWith(lastTreatment: value);
+  void setDosage(String? value) => state = state.copyWith(dosage: value);
+  void setLeafTexture(String? value) => state = state.copyWith(leafTexture: value);
+  void setOdorPresence(String? value) => state = state.copyWith(odorPresence: value);
+  void setSpeedOfSpread(String? value) => state = state.copyWith(speedOfSpread: value);
 
   /// Analyze the selected image using Gemini 3 Backend
   Future<void> analyzeImage() async {
@@ -100,45 +219,114 @@ class DiagnosisController extends StateNotifier<DiagnosisState> {
 
     try {
       // Get user language for consistency
-      final authState = _ref.read(authStateProvider);
-      final String languageCode = authState.value?.language ?? 'en-IN';
+      final currentLanguage = _ref.read(languageProvider);
+      final tr = _ref.read(languageProvider.notifier).translate;
+      final String languageCode = currentLanguage.backendName;
 
       // Get weather context if available
       final weatherState = _ref.read(weatherProvider);
       final weatherContext = weatherState.data;
 
-      final result = await _apiService.analyzeCrop(
+      final profileState = _ref.read(profileProvider);
+      final activeField = profileState.selectedField;
+      final activeCycleId = profileState.activeCycleId;
+
+      final authState = _ref.read(authStateProvider);
+      final farmerId = authState.value?.id ?? "anonymous_farmer";
+
+      final resultData = await _apiService.analyzeCrop(
         state.imageFile!, 
-        "demo-farmer-123", // Hardcoded for MVP
+        farmerId,
         state.description ?? "",
         languageCode: languageCode,
         weatherContext: weatherContext,
+        irrigationStage: state.irrigationStage,
+        soilMoisture: state.soilMoisture,
+        weatherEvent: state.weatherEvent,
+        spreadPattern: state.spreadPattern,
+        lastTreatment: state.lastTreatment,
+        dosage: state.dosage,
       );
       
+      // The backend /analyze endpoint returns flattened fields, not wrapped in 'result'
+      final result = resultData;
+      
+      // Seed initial input for extraction persistence
+      final String safeDescription = (state.description != null && state.description!.trim().isNotEmpty)
+          ? state.description!
+          : tr('no_feedback_provided');
+          
+      result['initial_user_input'] = safeDescription;
+      result['initial_ai_response'] = result['treatment_recommendation'] ?? result['disease_name'] ?? 'Unknown Issue';
+      
+      // Seed the conversation with both User request and initial AI diagnosis
+      final initialThread = [
+        ThreadItem(
+          role: 'user',
+          content: safeDescription,
+          timestamp: DateTime.now(),
+        ),
+        ThreadItem(
+          role: 'ai', 
+          content: result['treatment_recommendation'] ?? result['disease_name'] ?? 'Unknown Issue',
+          timestamp: DateTime.now(),
+          metadata: result, 
+        )
+      ];
+      
+      final String recordId = result['analysis_id'] ?? DateTime.now().millisecondsSinceEpoch.toString();
+      
       final record = DiagnosisRecord(
-        id: result['analysis_id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
+        id: recordId,
         imagePath: state.imageFile!.path,
         diseaseName: result['disease_name'] ?? 'Unknown',
         confidence: (result['confidence_score'] ?? 0.0).toDouble(),
         treatmentSummary: result['treatment_recommendation'] ?? '',
         timestamp: DateTime.now(),
-        farmerInput: state.description,
-        refinementReasoning: result['refinement_reasoning'], // available if refined
-        treatmentAdjustment: result['treatment_adjustment'],
+        farmerInput: safeDescription, // Step 1 marker for non-thread records
+        severity: result['severity'],
+        temperature: result['temperature'],
+        humidity: result['humidity'],
+        languageCode: languageCode,
+        irrigationStage: state.irrigationStage,
+        soilMoisture: state.soilMoisture,
+        weatherEvent: state.weatherEvent,
+        spreadPattern: state.spreadPattern,
+        lastTreatment: state.lastTreatment,
+        dosage: state.dosage,
+        cropName: activeField?.cropType ?? 'onion',
+        initialUserInput: result['initial_user_input'],
+        initialAiResponse: result['initial_ai_response'],
+        thread: initialThread,
       );
       
-      await LocalVault().saveDiagnosis(record);
+      // Hierarchical Save
+      if (activeField != null && activeCycleId != null) {
+        final userId = authState.value?.id ?? "anonymous";
+        await LocalVault().saveDiagnosis(
+          record, 
+          userId: userId,
+          fieldId: activeField.id, 
+          cycleId: activeCycleId
+        );
+
+        // Auto-Refresh: Invalidate history provider to update dashboard immediately
+        _ref.invalidate(diagnosisHistoryProvider);
+      }
 
       state = state.copyWith(
         isAnalyzing: false,
         diagnosisResult: result,
+        conversationThread: initialThread,
+        activeRecordId: recordId, // Pin the ID for future refinements
       );
     } catch (e) {
+      final tr = _ref.read(languageProvider.notifier);
       state = state.copyWith(
         isAnalyzing: false,
         errorMessage: e.toString().contains("API Error") 
             ? e.toString().replaceAll("Exception: ", "") 
-            : "Analysis failed. connection error.",
+            : tr.translate("analysis_failed_connection"),
       );
     }
   }
@@ -146,12 +334,6 @@ class DiagnosisController extends StateNotifier<DiagnosisState> {
   /// Translate the current diagnosis result
   Future<void> translateDiagnosis(String languageName) async {
     if (state.diagnosisResult == null) return;
-    
-    // Don't show full loading spinner, maybe just a smaller indicator or reuse analyzing?
-    // Re-using isAnalyzing might be confusing if it shows "Analyzing Crop...". 
-    // Ideally we add isTranslating, but for MVP let's just do it silently or reuse isAnalyzing with a different UI check?
-    // Let's reuse isAnalyzing but we need to arguably prevent the "Analyzing Crop" overlay if possible, or just accept it.
-    // Actually, the UI shows the overlay if isAnalyzing is true. That's fine, "Refining..."
     state = state.copyWith(isAnalyzing: true);
 
     try {
@@ -161,7 +343,7 @@ class DiagnosisController extends StateNotifier<DiagnosisState> {
       final prevention = (currentResult['prevention'] as List?)?.join(' . ') ?? '';
 
       // Format: "DISEASE_START...DISEASE_END..."
-      final fullText = """
+      final fullText = '''
 DISEASE_START
 $disease
 DISEASE_END
@@ -171,7 +353,7 @@ TREATMENT_END
 PREVENTION_START
 $prevention
 PREVENTION_END
-""";
+''';
 
       final translatedBlock = await _apiService.translateText(fullText, languageName);
 
@@ -205,19 +387,49 @@ PREVENTION_END
 
     try {
       final authState = _ref.read(authStateProvider);
-      final String languageCode = authState.value?.language ?? 'en-IN';
+      final currentLanguage = _ref.read(languageProvider);
+      final tr = _ref.read(languageProvider.notifier).translate;
+      final String languageCode = currentLanguage.backendName;
+
+      final profileState = _ref.read(profileProvider);
+      final activeField = profileState.selectedField;
+      
+      final farmerId = authState.value?.id ?? "anonymous_farmer";
+
+      // Enrich overrides with active plot context
+      final enrichedOverrides = {
+        ...overrides,
+        'acreage': activeField?.acreage,
+        'soil_type': activeField?.soilType,
+      };
+
+      // 1. Add User Feedback to Thread
+      final userItem = ThreadItem(
+        role: 'user',
+        content: feedback,
+        timestamp: DateTime.now(),
+      );
+      
+      final currentThread = List<ThreadItem>.from(state.conversationThread)..add(userItem);
+      
+      // Update UI immediately to show user message (optimistic)
+      state = state.copyWith(conversationThread: currentThread, isAnalyzing: true);
+
+      // 2. Prepare History for Backend
+      final historyForApi = currentThread.map((item) => item.toMap()).toList();
 
       final result = await _apiService.refineDiagnosis(
-        farmerId: "demo-farmer-123",
+        farmerId: farmerId,
         originalDiagnosis: state.diagnosisResult!,
         feedback: feedback,
-        contextOverrides: overrides,
+        contextOverrides: enrichedOverrides,
+        interactionHistory: historyForApi,
         language: languageCode,
       );
 
       final refinementData = result['result'];
       
-      // Merge refinement into existing result to preserve UI structure
+      // Merge refinement into existing result
       final currentResult = Map<String, dynamic>.from(state.diagnosisResult!);
       
       if (refinementData['is_revised'] == true) {
@@ -229,41 +441,83 @@ PREVENTION_END
       currentResult['refinement_reasoning'] = refinementData['reasoning'];
       currentResult['treatment_adjustment'] = refinementData['treatment_adjustment'];
       
-      // If there's a treatment adjustment, append it to recommendation
-      if (refinementData['treatment_adjustment'] != null && 
-          refinementData['treatment_adjustment'].toString().isNotEmpty) {
-        String currentTreat = currentResult['treatment_recommendation'] ?? "";
-        currentResult['treatment_recommendation'] = "$currentTreat\n\n[Adjustment]: ${refinementData['treatment_adjustment']}";
-      }
+      // Preserve Markers for next refinement
+      currentResult['initial_user_input'] = state.diagnosisResult?['initial_user_input'];
+      currentResult['initial_ai_response'] = state.diagnosisResult?['initial_ai_response'];
 
-      // Save refined record to history
-      final record = DiagnosisRecord(
-        id: currentResult['analysis_id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
+
+      // 3. Add AI Response to Thread
+      final aiItem = ThreadItem(
+        role: 'ai',
+        content: refinementData['reasoning'] ?? tr('default_ai_response'),
+        timestamp: DateTime.now(),
+        metadata: refinementData,
+      );
+      
+      final updatedThread = List<ThreadItem>.from(currentThread)..add(aiItem);
+
+      // 4. Save Record
+      // Ensure we have seeds for Step 1 & 2 markers
+      final String initialRequest = currentResult['initial_user_input'] ?? 
+          (state.conversationThread.isNotEmpty ? state.conversationThread.first.content : feedback);
+      final String initialDiagnosis = currentResult['initial_ai_response'] ?? 
+          (state.conversationThread.length > 1 ? state.conversationThread[1].content : (currentResult['treatment_recommendation'] ?? ''));
+
+      final String recordId = state.activeRecordId ?? (currentResult['analysis_id'] ?? DateTime.now().millisecondsSinceEpoch.toString());
+
+      final historyRecord = DiagnosisRecord(
+        id: recordId,
         imagePath: state.imageFile!.path,
-        diseaseName: currentResult['disease_name'] ?? 'Unknown',
+        diseaseName: currentResult['disease_name'] ?? tr('unknown_issue'),
         confidence: (currentResult['confidence_score'] ?? 0.0).toDouble(),
         treatmentSummary: currentResult['treatment_recommendation'] ?? '',
         timestamp: DateTime.now(),
-        farmerInput: feedback,
+        farmerInput: initialRequest, // Root input
+        severity: currentResult['severity'] ?? state.diagnosisResult?['severity'],
+        languageCode: languageCode,
+        cropName: activeField?.cropType ?? currentResult['crop_name'] ??'onion',
         refinementReasoning: currentResult['refinement_reasoning'],
-        treatmentAdjustment: refinementData['treatment_adjustment'],
+        treatmentAdjustment: currentResult['treatment_adjustment'],
+        initialUserInput: initialRequest,
+        initialAiResponse: initialDiagnosis,
+        thread: updatedThread,
       );
-      await LocalVault().saveDiagnosis(record);
+      
+      // Hierarchical Save (Refinement)
+      if (profileState.selectedFieldId != null && profileState.activeCycleId != null) {
+        final userId = authState.value?.id ?? "anonymous";
+        await LocalVault().saveDiagnosis(
+          historyRecord,
+          userId: userId,
+          fieldId: profileState.selectedFieldId!,
+          cycleId: profileState.activeCycleId!,
+        );
+
+        // Auto-Refresh: Invalidate history provider to update dashboard/history list
+        _ref.invalidate(diagnosisHistoryProvider);
+      }
 
       state = state.copyWith(
         isAnalyzing: false,
         diagnosisResult: currentResult,
+        conversationThread: updatedThread,
       );
     } catch (e) {
+      final tr = _ref.read(languageProvider.notifier);
       state = state.copyWith(
         isAnalyzing: false,
-        errorMessage: "Refinement failed: ${e.toString()}",
+        errorMessage: "${tr.translate('refinement_failed')}: ${e.toString()}",
       );
     }
   }
 
   /// Clear the selected image and results
   void clearImage() {
+    _player.stop();
+    state = const DiagnosisState();
+  }
+
+  void reset() {
     _player.stop();
     state = const DiagnosisState();
   }
@@ -287,9 +541,10 @@ PREVENTION_END
       return;
     }
 
-    final treatment = state.diagnosisResult!['treatment_recommendation'] ?? "No advice available.";
-    final disease = state.diagnosisResult!['disease_name'] ?? "Unknown issue";
-    final textToSpeak = "Diagnosis: $disease. Recommendation: $treatment";
+    final tr = _ref.read(languageProvider.notifier);
+    final treatment = state.diagnosisResult!['treatment_recommendation'] ?? tr.translate('no_advice_available');
+    final disease = state.diagnosisResult!['disease_name'] ?? tr.translate('unknown_issue');
+    final textToSpeak = "${tr.translate('diagnosis_prefix')}: $disease. ${tr.translate('recommendation_prefix')}: $treatment";
 
     state = state.copyWith(isSynthesizing: true, errorMessage: null);
 
@@ -302,7 +557,7 @@ PREVENTION_END
       debugPrint("TTS: Received ${audioBytes.length} bytes");
       
       if (audioBytes.isEmpty) {
-        throw Exception("Received empty audio bytes from server.");
+        throw Exception(tr.translate('audio_empty_error'));
       }
 
       final dataUrl = Uri.dataFromBytes(audioBytes, mimeType: 'audio/mpeg').toString();
@@ -313,10 +568,36 @@ PREVENTION_END
       state = state.copyWith(isSynthesizing: false, isAudioPlaying: true);
     } catch (e) {
       debugPrint("TTS Error in playAdvice: $e");
+      final tr = _ref.read(languageProvider.notifier);
       state = state.copyWith(
         isSynthesizing: false,
-        errorMessage: "Failed to play advice: $e",
+        errorMessage: "${tr.translate('audio_play_failed')}: $e",
       );
+    }
+  }
+
+  /// Delete a specific record
+  Future<void> deleteRecord(String recordId) async {
+    final authState = _ref.read(authStateProvider);
+    final profileState = _ref.read(profileProvider);
+    final userId = authState.value?.id;
+    final fieldId = profileState.selectedFieldId;
+    final cycleId = profileState.activeCycleId;
+
+    if (userId != null && fieldId != null && cycleId != null) {
+      final key = PathEnforcer.localCompositeKey(
+        userId: userId,
+        fieldId: fieldId,
+        cycleId: cycleId,
+        activityId: recordId,
+      );
+      await LocalVault().deleteDiagnosisRecord(key);
+      _ref.invalidate(diagnosisHistoryProvider);
+      
+      // If we deleted the active record, clear the state
+      if (state.activeRecordId == recordId) {
+        reset();
+      }
     }
   }
 
@@ -333,9 +614,19 @@ final diagnosisProvider = StateNotifierProvider.autoDispose<DiagnosisController,
   return DiagnosisController(apiService, ref);
 });
 
-/// Provider for Local History (Offline Capable)
+/// Provider for Local History (Context-Aware)
 final diagnosisHistoryProvider = FutureProvider.autoDispose<List<DiagnosisRecord>>((ref) async {
-  // Since Hive is synchronous for reads, we can just return the list.
-  // Using FutureProvider allows for loading states if we were to move to async storage later.
-  return LocalVault().getHistory();
+  final profileState = ref.watch(profileProvider);
+  final authState = ref.watch(authStateProvider);
+  final userId = authState.value?.id;
+  
+  if (userId == null || profileState.selectedFieldId == null || profileState.activeCycleId == null) {
+    return [];
+  }
+
+  return LocalVault().getHistory(
+    userId: userId,
+    fieldId: profileState.selectedFieldId!,
+    cycleId: profileState.activeCycleId!,
+  );
 });

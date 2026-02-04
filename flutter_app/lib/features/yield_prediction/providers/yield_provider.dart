@@ -2,10 +2,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_app/core/api/agri_pulse_service.dart';
 import 'package:flutter_app/features/dashboard/presentation/providers/weather_provider.dart';
 import 'package:flutter_app/features/yield_prediction/domain/entities/yield_prediction.dart';
-import 'package:flutter_app/features/yield_prediction/providers/language_provider.dart';
-import 'package:flutter_app/core/services/local_vault.dart';
+import 'package:flutter_app/core/localization/language_provider.dart';
+import 'package:flutter_app/features/profile/providers/profile_provider.dart';
+import 'package:flutter_app/features/auth/providers/auth_provider.dart';
+import '../../../../core/services/local_vault.dart';
 import 'package:flutter_app/features/yield_prediction/models/yield_record.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_app/core/api/path_enforcer.dart';
 
 class YieldState {
   final bool isLoading;
@@ -13,10 +16,10 @@ class YieldState {
   final YieldPrediction? result;
   
   // Input fields
-  final String cropName;
+  final String? cropName;
   final String fieldName;
-  final double fieldArea;
-  final String soilType;
+  final double? fieldArea;
+  final String? soilType;
   final DateTime? plantedDate;
   final DateTime? expectedHarvestDate;
 
@@ -24,10 +27,10 @@ class YieldState {
     this.isLoading = false,
     this.errorMessage,
     this.result,
-    this.cropName = 'Onion',
+    this.cropName,
     this.fieldName = '',
-    this.fieldArea = 1.0,
-    this.soilType = 'Clay Loam',
+    this.fieldArea,
+    this.soilType,
     this.plantedDate,
     this.expectedHarvestDate,
   });
@@ -71,6 +74,11 @@ class YieldController extends StateNotifier<YieldState> {
   void updateExpectedHarvestDate(DateTime value) => state = state.copyWith(expectedHarvestDate: value);
 
   Future<void> predictYield() async {
+    if (state.cropName == null || state.fieldArea == null || state.soilType == null) {
+      state = state.copyWith(errorMessage: "Please select all field parameters before running prediction.");
+      return;
+    }
+
     state = state.copyWith(isLoading: true, errorMessage: null);
 
     try {
@@ -87,11 +95,11 @@ class YieldController extends StateNotifier<YieldState> {
 
       final response = await _apiService.predictYield(
         farmerId: "demo-farmer-123", // MVP Hardcoded
-        cropName: state.cropName,
-        fieldArea: state.fieldArea,
+        cropName: state.cropName!,
+        fieldArea: state.fieldArea!,
         plantedDate: state.plantedDate?.toIso8601String() ?? DateTime.now().toIso8601String(),
         expectedHarvestDate: state.expectedHarvestDate?.toIso8601String(),
-        soilType: state.soilType,
+        soilType: state.soilType!,
         weatherForecast: weatherData,
         language: languageName,
       );
@@ -102,17 +110,35 @@ class YieldController extends StateNotifier<YieldState> {
           response['result']
         );
 
-        // Save to History
+        final profileState = _ref.read(profileProvider);
+        final activeField = profileState.selectedField;
+        final activeCycleId = profileState.activeCycleId;
+
+        // Save to History (Hierarchical)
         final record = YieldRecord(
           id: prediction.id,
-          cropName: state.cropName,
-          fieldName: state.fieldName,
+          cropName: state.cropName!,
+          fieldName: activeField?.name ?? state.fieldName,
           expectedYield: prediction.expectedYield,
           confidence: prediction.confidence,
           timestamp: DateTime.now(),
           rawAiResponse: response['result'],
+          languageCode: currentLanguage.backendName,
         );
-        await LocalVault().saveYield(record);
+
+        if (activeField != null && activeCycleId != null) {
+          final authState = _ref.read(authStateProvider);
+          final userId = authState.value?.id ?? "anonymous";
+          await LocalVault().saveYield(
+            record, 
+            userId: userId,
+            fieldId: activeField.id, 
+            cycleId: activeCycleId
+          );
+          
+          // Auto-Refresh: Invalidate history provider to update dashboard immediately
+          _ref.invalidate(yieldHistoryProvider);
+        }
 
         state = state.copyWith(isLoading: false, result: prediction);
       } else {
@@ -174,6 +200,31 @@ class YieldController extends StateNotifier<YieldState> {
   void reset() {
     state = YieldState(plantedDate: DateTime.now().subtract(const Duration(days: 30)));
   }
+
+  /// Delete a specific record
+  Future<void> deleteRecord(String recordId) async {
+    final authState = _ref.read(authStateProvider);
+    final profileState = _ref.read(profileProvider);
+    final userId = authState.value?.id;
+    final fieldId = profileState.selectedFieldId;
+    final cycleId = profileState.activeCycleId;
+
+    if (userId != null && fieldId != null && cycleId != null) {
+      final key = PathEnforcer.localCompositeKey(
+        userId: userId,
+        fieldId: fieldId,
+        cycleId: cycleId,
+        activityId: recordId,
+      );
+      await LocalVault().deleteYieldRecord(key);
+      _ref.invalidate(yieldHistoryProvider);
+      
+      // If we deleted the active record, clear the state
+      if (state.result?.id == recordId) {
+        reset();
+      }
+    }
+  }
 }
 
 final yieldProvider = StateNotifierProvider.autoDispose<YieldController, YieldState>((ref) {
@@ -181,6 +232,18 @@ final yieldProvider = StateNotifierProvider.autoDispose<YieldController, YieldSt
   return YieldController(apiService, ref);
 });
 
-final yieldHistoryProvider = FutureProvider<List<YieldRecord>>((ref) async {
-  return LocalVault().getYieldHistory();
+final yieldHistoryProvider = FutureProvider.autoDispose<List<YieldRecord>>((ref) async {
+  final profileState = ref.watch(profileProvider);
+  final authState = ref.watch(authStateProvider);
+  final userId = authState.value?.id;
+  
+  if (userId == null || profileState.selectedFieldId == null || profileState.activeCycleId == null) {
+    return [];
+  }
+
+  return LocalVault().getYieldHistory(
+    userId: userId,
+    fieldId: profileState.selectedFieldId!,
+    cycleId: profileState.activeCycleId!,
+  );
 });

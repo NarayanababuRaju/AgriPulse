@@ -18,11 +18,13 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'mock-api-key',
-    appId: 'mock-app-id',
-    messagingSenderId: 'mock-sender-id',
-    projectId: 'mock-project-id',
-    authDomain: 'mock-project-id.firebaseapp.com',
-    storageBucket: 'mock-project-id.appspot.com',
+    apiKey: 'AIzaSyB_rvzBUHalAf24VIbPmVXqSWlPF398Lc4',
+    appId: '1:472219254957:web:ac271c16662c3d40b24624',
+    messagingSenderId: '472219254957',
+    projectId: 'agri-pulse-firebase',
+    authDomain: 'agri-pulse-firebase.firebaseapp.com',
+    storageBucket: 'agri-pulse-firebase.firebasestorage.app',
+    measurementId: 'G-RD3810L2RT',
   );
+
 }

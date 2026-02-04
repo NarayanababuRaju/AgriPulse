@@ -22,15 +22,21 @@ class AnalysisResponse(BaseModel):
 @router.post("/analyze", response_model=Dict[str, Any])
 async def analyze_crop(
     farmer_id: str = Form(...),
+    field_id: str = Form("unassigned_field"),
+    cycle_id: str = Form("default_cycle"),
     image: UploadFile = File(...),
     voice_transcription: str = Form(...),
+    acreage: float = Form(1.0),
+    soil_type: str = Form("Unknown"),
     weather_context: Optional[str] = Form(None),
     language: Optional[str] = Form(None)
 ):
     """
-    Analyze crop disease from image and voice input
+    Analyze crop disease from image and voice input (Hierarchical)
     
     - **farmer_id**: Farmer's unique ID
+    - **field_id**: Field ID (default: unassigned_field)
+    - **cycle_id**: Crop cycle ID (default: default_cycle)
     - **image**: Crop photo (JPEG/PNG)
     - **voice_transcription**: Farmer's description in local language
     - **weather_context**: Optional weather data (JSON string)
@@ -54,10 +60,12 @@ async def analyze_crop(
             except Exception as je:
                 logger.warning(f"Failed to parse weather context JSON: {je}. Context was: {weather_context}")
         
-        # Call Gemini service
+        # Call Gemini service with hierarchical grounding
         result = await gemini_service.analyze_crop_disease(
             image_data=image_data,
             voice_transcription=voice_transcription,
+            acreage=acreage,
+            soil_type=soil_type,
             weather_context=weather_dict,
             language=language
         )
@@ -65,11 +73,15 @@ async def analyze_crop(
         if result["status"] == "error":
             raise HTTPException(status_code=500, detail=result["error"])
         
-        # Save to Firestore
+        # Save to Hierarchical Firestore
         analysis_id = await db_service.save_analysis(
             farmer_id=farmer_id,
+            field_id=field_id,
+            cycle_id=cycle_id,
             analysis_data={
                 "type": "disease_analysis",
+                "field_id": field_id,
+                "cycle_id": cycle_id,
                 "voice_transcription": voice_transcription,
                 "gemini_response": result["analysis"],
                 "model_used": result["model_used"]
@@ -95,6 +107,8 @@ async def analyze_crop(
 @router.post("/predict-yield")
 async def predict_yield(
     farmer_id: str = Form(...),
+    field_id: str = Form("unassigned_field"),
+    cycle_id: str = Form("default_cycle"),
     crop_name: str = Form(...),
     field_area: float = Form(...),
     planted_date: str = Form(...),
@@ -107,11 +121,15 @@ async def predict_yield(
     Predict crop yield using Gemini Pro reasoning
     
     - **farmer_id**: Farmer's unique ID
+    - **field_id**: Field ID (default: unassigned_field)
+    - **cycle_id**: Crop cycle ID (default: default_cycle)
     - **crop_name**: Type of crop
     - **field_area**: Field size in acres
     - **planted_date**: When crop was planted
     - **soil_type**: Soil classification
     - **weather_forecast**: 7-day forecast (JSON string)
+    - **expected_harvest_date**: Expected harvest date
+    - **language**: Language of the input (optional)
     """
     try:
         import json
@@ -136,11 +154,15 @@ async def predict_yield(
         if result["status"] == "error":
             raise HTTPException(status_code=500, detail=result["error"])
         
-        # Save prediction
+        # Save hierarchical prediction
         prediction_id = await db_service.save_prediction(
             farmer_id=farmer_id,
+            field_id=field_id,
+            cycle_id=cycle_id,
             prediction_data={
                 "crop_data": crop_data,
+                "field_id": field_id,
+                "cycle_id": cycle_id,
                 "gemini_response": result["prediction"],
                 "model_used": result["model_used"]
             }
@@ -160,9 +182,12 @@ async def predict_yield(
         raise HTTPException(status_code=500, detail=str(e))
 class RefinementRequest(BaseModel):
     farmer_id: str
+    field_id: str = "unassigned_field"
+    cycle_id: str = "default_cycle"
     original_diagnosis: Dict[str, Any]
     farmer_feedback: str
     context_overrides: Dict[str, Any] = {}
+    interaction_history: Optional[list[Dict[str, Any]]] = []
     language: Optional[str] = None
 
 
@@ -179,6 +204,7 @@ async def refine_diagnosis(request: RefinementRequest):
             original_diagnosis=request.original_diagnosis,
             farmer_feedback=request.farmer_feedback,
             context_overrides=request.context_overrides,
+            interaction_history=request.interaction_history,
             language=request.language
         )
         

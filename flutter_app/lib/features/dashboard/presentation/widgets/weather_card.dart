@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_app/core/theme/color_palette.dart';
 import '../../../../core/components/loading_shimmer.dart';
+import 'package:flutter_app/core/localization/language_provider.dart';
 
 /// WeatherCard - Displays current weather information
 /// 
 /// A visually appealing card using a gradient background to represent 
 /// the "Earth & Growth" theme. Supports Shimmer Loading.
 
-class WeatherCard extends StatelessWidget {
+class WeatherCard extends ConsumerWidget {
   final bool isLoading;
   final String condition;
   final int temperature;
@@ -60,11 +62,24 @@ class WeatherCard extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     if (isLoading) return _buildSkeleton();
     
+    // Watch language state to trigger rebuilds on language change
+    ref.watch(languageProvider);
+    final tr = ref.watch(languageProvider.notifier);
     final displayDate = date ?? DateTime.now();
-    final dateStr = "Today, ${DateFormat('d MMM').format(displayDate)}";
+    final dateStr = "${tr.translate('today')}, ${DateFormat('d MMM').format(displayDate)}";
+
+    // Map common condition strings to translation keys
+    String getDisplayCondition() {
+      final cond = condition.toLowerCase();
+      if (cond.contains('sunny') || cond.contains('clear')) return tr.translate('weather_sunny');
+      if (cond.contains('cloud')) return tr.translate('weather_cloudy');
+      if (cond.contains('rain')) return tr.translate('weather_rain');
+      if (cond.contains('wind')) return tr.translate('weather_windy');
+      return condition; // Fallback
+    }
 
     return Container(
       width: double.infinity,
@@ -73,7 +88,7 @@ class WeatherCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -116,7 +131,7 @@ class WeatherCard extends StatelessWidget {
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    condition == "Sunny" ? Icons.wb_sunny_rounded : Icons.cloud,
+                    condition.toLowerCase().contains('sunny') ? Icons.wb_sunny_rounded : Icons.cloud,
                     color: Colors.white,
                   ),
                 ),
@@ -141,7 +156,7 @@ class WeatherCard extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8, left: 8),
                   child: Text(
-                    condition,
+                    getDisplayCondition(),
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 18,
@@ -155,8 +170,8 @@ class WeatherCard extends StatelessWidget {
             const SizedBox(height: 8),
             
             // Footer Info (Humidity / Wind) - Mock Data
-            Row(
-              children: const [
+            const Row(
+              children: [
                 Icon(Icons.water_drop_outlined, color: Colors.white70, size: 16),
                 SizedBox(width: 4),
                 Text(
@@ -186,8 +201,8 @@ class WeatherCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: Colors.grey.shade200),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
+      child: const Padding(
+        padding: EdgeInsets.all(24.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -197,28 +212,28 @@ class WeatherCard extends StatelessWidget {
               children: [
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
+                  children: [
                     LoadingShimmer(width: 140, height: 20),
                     SizedBox(height: 8),
                     LoadingShimmer(width: 100, height: 14),
                   ],
                 ),
-                const LoadingShimmer(width: 40, height: 40, radius: 20),
+                LoadingShimmer(width: 40, height: 40, radius: 20),
               ],
             ),
-            const SizedBox(height: 24),
+            SizedBox(height: 24),
             // Temp Skeleton
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
-              children: const [
+              children: [
                 LoadingShimmer(width: 80, height: 48),
                 SizedBox(width: 16),
                 LoadingShimmer(width: 60, height: 24),
               ],
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             // Footer Skeleton
-            const LoadingShimmer(width: 200, height: 16),
+            LoadingShimmer(width: 200, height: 16),
           ],
         ),
       ),

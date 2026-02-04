@@ -8,6 +8,7 @@ class YieldRecord {
   final double confidence;
   final DateTime timestamp;
   final Map<String, dynamic> rawAiResponse;
+  final String? languageCode;
 
   YieldRecord({
     required this.id,
@@ -17,6 +18,7 @@ class YieldRecord {
     required this.confidence,
     required this.timestamp,
     required this.rawAiResponse,
+    this.languageCode,
   });
 }
 
@@ -68,11 +70,16 @@ class YieldRecordAdapter extends TypeAdapter<YieldRecord> {
     
     // Backward compatibility for old records without rawAiResponse
     Map<String, dynamic> rawAiResponse = {};
+    String? languageCode;
     try {
       // Hive BinaryReader will throw an error if it hits the end of the entry's byte stream
       final map = reader.readMap();
       // Use deep conversion to handle nested LinkedMaps from Hive
       rawAiResponse = _deepConvertMap(map);
+      
+      if (reader.availableBytes > 0) {
+        if (reader.readBool()) languageCode = reader.readString();
+      }
     } catch (e) {
       // If we reach here, it's likely an old record. We return an empty map.
       // The YieldDetailsScreen already handles empty maps gracefully.
@@ -86,6 +93,7 @@ class YieldRecordAdapter extends TypeAdapter<YieldRecord> {
       confidence: confidence,
       timestamp: timestamp,
       rawAiResponse: rawAiResponse,
+      languageCode: languageCode,
     );
   }
 
@@ -98,5 +106,8 @@ class YieldRecordAdapter extends TypeAdapter<YieldRecord> {
     writer.writeDouble(obj.confidence);
     writer.writeInt(obj.timestamp.millisecondsSinceEpoch);
     writer.writeMap(obj.rawAiResponse);
+    
+    writer.writeBool(obj.languageCode != null);
+    if (obj.languageCode != null) writer.writeString(obj.languageCode!);
   }
 }

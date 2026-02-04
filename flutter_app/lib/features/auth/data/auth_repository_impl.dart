@@ -27,7 +27,7 @@ class AuthRepositoryImpl implements AuthRepository {
 
     // Simple mock validation: "123456" is the magic code
     if (smsCode == "123456") {
-      final user = const Farmer(
+      const user = Farmer(
         id: "farmer_1",
         phoneNumber: "+919535054466", // Mock
         name: "Raju", // Mock Name

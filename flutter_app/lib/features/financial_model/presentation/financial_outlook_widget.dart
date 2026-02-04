@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 import 'package:flutter_app/core/theme/color_palette.dart';
-import 'package:flutter_app/features/yield_prediction/providers/language_provider.dart';
+import 'package:flutter_app/core/localization/language_provider.dart';
 import 'package:flutter_app/features/financial_model/domain/financial_calculator.dart';
 
 class FinancialOutlookWidget extends ConsumerWidget {
@@ -20,6 +20,8 @@ class FinancialOutlookWidget extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Watch language state to trigger rebuilds on language change
+    ref.watch(languageProvider);
     final languageNotifier = ref.read(languageProvider.notifier);
     final currencyFormatter = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
 
@@ -31,7 +33,7 @@ class FinancialOutlookWidget extends ConsumerWidget {
         border: Border.all(color: Colors.grey.shade200),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 15,
             offset: const Offset(0, 4),
           ),
@@ -153,7 +155,7 @@ class FinancialOutlookWidget extends ConsumerWidget {
              languageNotifier.translate('financial_disclaimer').replaceAll('{cropName}', cropName),
              style: GoogleFonts.outfit(
                fontSize: 11,
-               color: ColorPalette.textSecondary.withOpacity(0.6),
+               color: ColorPalette.textSecondary.withValues(alpha: 0.6),
                fontStyle: FontStyle.italic,
              ),
            ),
@@ -180,7 +182,7 @@ class FinancialOutlookWidget extends ConsumerWidget {
         children: [
           Row(
             children: [
-              Icon(icon, size: 16, color: ColorPalette.textSecondary.withOpacity(0.5)),
+              Icon(icon, size: 16, color: ColorPalette.textSecondary.withValues(alpha: 0.5)),
               const SizedBox(width: 6),
               Flexible( // Added Flexible to prevent overflow
                 child: Text(

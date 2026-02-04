@@ -6,6 +6,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../core/theme/color_palette.dart';
 import '../../../core/widgets/loading_overlay.dart';
+import '../../../core/widgets/language_selector.dart';
+import '../../../core/localization/language_provider.dart';
 import '../providers/auth_provider.dart';
 import '../../../core/router/app_router.dart';
 
@@ -40,6 +42,10 @@ class _FarmerLoginScreenState extends ConsumerState<FarmerLoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Watch language state to trigger rebuilds on language change
+    ref.watch(languageProvider);
+    final tr = ref.watch(languageProvider.notifier);
+    
     // Watch the login state to rebuild UI when state changes
     final loginState = ref.watch(loginControllerProvider);
     final isOtpSent = loginState.status == LoginStatus.otpSent;
@@ -82,12 +88,19 @@ class _FarmerLoginScreenState extends ConsumerState<FarmerLoginScreen> {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    Colors.black.withOpacity(0.3),
-                    Colors.black.withOpacity(0.6),
+                    Colors.black.withValues(alpha: 0.3),
+                    Colors.black.withValues(alpha: 0.6),
                   ],
                 ),
               ),
             ),
+          ),
+
+          // 2.5. Language Selector (Top Right)
+          const Positioned(
+            top: 48,
+            right: 24,
+            child: LanguageSelector(),
           ),
 
           // 3. Content
@@ -130,7 +143,7 @@ class _FarmerLoginScreenState extends ConsumerState<FarmerLoginScreen> {
                           ).animate().fadeIn(delay: 200.ms),
                           
                           Text(
-                            "Your Intelligent Farming Companion",
+                            tr.translate('login_tagline'),
                             textAlign: TextAlign.center,
                             style: GoogleFonts.outfit(
                               fontSize: 16,
@@ -144,14 +157,16 @@ class _FarmerLoginScreenState extends ConsumerState<FarmerLoginScreen> {
                           Card(
                             elevation: 8,
                             shadowColor: Colors.black45,
-                            color: Colors.white.withOpacity(0.95),
+                            color: Colors.white.withValues(alpha: 0.95),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
                             child: Padding(
                               padding: const EdgeInsets.all(24),
                               child: Column(
                                 children: [
                                   Text(
-                                    isOtpSent ? "Enter Verification Code" : "Farmer Login",
+                                    isOtpSent 
+                                      ? tr.translate('login_otp_title')
+                                      : tr.translate('login_title'),
                                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                                       fontWeight: FontWeight.bold,
                                       color: ColorPalette.emeraldGreen,
@@ -166,8 +181,8 @@ class _FarmerLoginScreenState extends ConsumerState<FarmerLoginScreen> {
                                       controller: _phoneController,
                                       keyboardType: TextInputType.phone,
                                       decoration: InputDecoration(
-                                        labelText: "Phone Number",
-                                        hintText: "98765 43210",
+                                        labelText: tr.translate('login_phone_label'),
+                                        hintText: tr.translate('login_phone_hint'),
                                         
                                         // Country Code Picker as Prefix
                                         prefixIcon: CountryCodePicker(
@@ -208,7 +223,10 @@ class _FarmerLoginScreenState extends ConsumerState<FarmerLoginScreen> {
                                             foregroundColor: Colors.white,
                                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
                                         ),
-                                        child: const Text("Send OTP", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                                        child: Text(
+                                          tr.translate('login_send_otp'),
+                                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                        ),
                                       ),
                                     ),
                                   ] else ...[
@@ -232,7 +250,7 @@ class _FarmerLoginScreenState extends ConsumerState<FarmerLoginScreen> {
                                     const SizedBox(height: 12),
                                     
                                     Text(
-                                      "Sent to $_selectedCountryCode ${_phoneController.text}",
+                                      "${tr.translate('login_otp_sent_to')} $_selectedCountryCode ${_phoneController.text}",
                                       style: const TextStyle(color: ColorPalette.textSecondary),
                                     ),
                                     
@@ -252,7 +270,10 @@ class _FarmerLoginScreenState extends ConsumerState<FarmerLoginScreen> {
                                             foregroundColor: Colors.white,
                                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
                                         ),
-                                        child: const Text("Verify & Login", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                                        child: Text(
+                                          tr.translate('login_verify'),
+                                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                        ),
                                       ),
                                     ),
                                     
@@ -262,7 +283,7 @@ class _FarmerLoginScreenState extends ConsumerState<FarmerLoginScreen> {
                                         ref.read(loginControllerProvider.notifier).reset();
                                         _otpController.clear();
                                       },
-                                      child: const Text("Change Number"),
+                                      child: Text(tr.translate('login_change_number')),
                                     ),
                                   ],
                                 ],
@@ -272,10 +293,10 @@ class _FarmerLoginScreenState extends ConsumerState<FarmerLoginScreen> {
                           
                           const SizedBox(height: 32),
                           
-                          const Text(
-                            "Powered by Gemini 3.0",
+                          Text(
+                            tr.translate('login_powered_by'),
                             textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.white70, fontSize: 12),
+                            style: const TextStyle(color: Colors.white70, fontSize: 12),
                           ),
                         ],
                       ),

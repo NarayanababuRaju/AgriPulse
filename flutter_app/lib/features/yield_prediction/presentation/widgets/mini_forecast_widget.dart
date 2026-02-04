@@ -137,6 +137,6 @@ class _MiniForecastWidgetState extends ConsumerState<MiniForecastWidget> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
       ),
-    ).animate(onPlay: (c) => c.repeat()).shimmer(color: Colors.grey.withOpacity(0.2));
+    ).animate(onPlay: (c) => c.repeat()).shimmer(color: Colors.grey.withValues(alpha: 0.2));
   }
 }

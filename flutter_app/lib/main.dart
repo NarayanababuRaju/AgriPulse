@@ -9,6 +9,7 @@ import 'features/crop_diagnosis/models/diagnosis_record.dart';
 import 'features/yield_prediction/models/yield_record.dart';
 import 'core/models/weather_cache.dart';
 import 'core/services/local_vault.dart';
+import 'features/crop_diagnosis/models/thread_item.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,10 +23,11 @@ Future<void> main() async {
     debugPrint("❌ AgriPulse: Hive failed: $e");
   }
   
-  // Register Adapters (Type IDs: 0, 1, 2)
+  // Register Adapters (Type IDs: 0, 1, 2, 3)
   Hive.registerAdapter(DiagnosisRecordAdapter());
   Hive.registerAdapter(YieldRecordAdapter());
   Hive.registerAdapter(WeatherCacheAdapter());
+  Hive.registerAdapter(ThreadItemAdapter());
   
   // Initialize LocalVault Service
   try {
@@ -35,16 +37,14 @@ Future<void> main() async {
     debugPrint("❌ AgriPulse: LocalVault failed: $e");
   }
   
-  // Initialize Firebase
-  // TODO: Run `flutterfire configure` to generate firebase_options.dart
-  // For now, we wrap in try-catch to allow UI development without Firebase keys present
+  // Initialize Firebase with the generated options
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+    debugPrint("✅ AgriPulse: Firebase initialized successfully.");
   } catch (e) {
-    debugPrint("⚠️ Firebase initialization failed: $e");
-    debugPrint("ℹ️  Running in UI-only mode. Provide firebase_options.dart to enable Auth/Firestore.");
+    debugPrint("❌ Firebase initialization failed: $e");
   }
 
   runApp(
