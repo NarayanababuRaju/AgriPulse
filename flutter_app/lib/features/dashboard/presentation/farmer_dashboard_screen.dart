@@ -11,8 +11,12 @@ import 'providers/weather_provider.dart'; // Import Weather Provider
 import 'widgets/weather_card.dart';
 import 'widgets/action_card.dart';
 import 'widgets/recent_activity_list.dart';
+import 'widgets/field_selector.dart';
+import '../../profile/providers/profile_provider.dart';
+import 'package:flutter_app/core/api/path_enforcer.dart';
 import 'package:flutter_app/core/widgets/offline_banner.dart';
-import '../../yield_prediction/providers/language_provider.dart';
+import 'package:flutter_app/core/localization/language_provider.dart';
+import 'package:flutter_app/core/widgets/language_selector.dart';
 
 /// FarmerDashboardScreen - The main home screen for the farmer
 /// 
@@ -40,6 +44,10 @@ class FarmerDashboardScreen extends ConsumerWidget {
     ref.watch(languageProvider); 
     final tr = ref.read(languageProvider.notifier).translate;
 
+    // Plot Context
+    final profileState = ref.watch(profileProvider);
+    final activeField = profileState.selectedField;
+
     return Scaffold(
       backgroundColor: ColorPalette.offWhite,
       body: SafeArea(
@@ -66,7 +74,9 @@ class FarmerDashboardScreen extends ConsumerWidget {
                           ),
                         ),
                         Text(
-                          user?.name ?? "Raju", 
+                          activeField != null && activeField.id != PathEnforcer.unassignedFieldId
+                            ? "${user?.name ?? "Raju"} • ${activeField.name}"
+                            : user?.name ?? "Raju", 
                           style: GoogleFonts.outfit(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
@@ -77,46 +87,10 @@ class FarmerDashboardScreen extends ConsumerWidget {
                     ),
                     Row(
                       children: [
-                        // Language Dropdown
-                        Consumer(
-                          builder: (context, ref, _) {
-                            final language = ref.watch(languageProvider);
-                            return Container(
-                              margin: const EdgeInsets.only(right: 12),
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: Colors.grey.shade300),
-                              ),
-                              child: DropdownButtonHideUnderline(
-                                child: DropdownButton<AppLanguage>(
-                                  value: language,
-                                  isDense: true,
-                                  icon: const Icon(Icons.language, size: 18, color: ColorPalette.emeraldGreen),
-                                  items: AppLanguage.values.map((lang) {
-                                    return DropdownMenuItem(
-                                      value: lang,
-                                      child: Text(
-                                        lang == AppLanguage.en ? "English" :
-                                        lang == AppLanguage.hi ? "हिन्दी" :
-                                        lang == AppLanguage.ta ? "தமிழ்" :
-                                        lang == AppLanguage.kn ? "ಕನ್ನಡ" :
-                                        lang == AppLanguage.te ? "తెలుగు" : "മലയാളം",
-                                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                                      ),
-                                    );
-                                  }).toList(),
-                                  onChanged: (lang) {
-                                    if (lang != null) {
-                                      ref.read(languageProvider.notifier).setLanguage(lang);
-                                    }
-                                  },
-                                ),
-                              ),
-                            );
-                          },
+                        const LanguageSelector(
+                          textColor: ColorPalette.textPrimary,
                         ),
+                        const SizedBox(width: 12),
                         _buildProfileButton(context, ref),
                       ],
                     ),
@@ -124,7 +98,7 @@ class FarmerDashboardScreen extends ConsumerWidget {
                 ),
                 
                 const SizedBox(height: 24),
-                
+
                 // WEATHER HERO CARD
                 WeatherCard(
                   isLoading: weatherState.isLoading,
@@ -135,7 +109,13 @@ class FarmerDashboardScreen extends ConsumerWidget {
                 ).animate()
                     .fadeIn(duration: 600.ms)
                     .slideY(begin: 0.1, end: 0, curve: Curves.easeOut),
-                
+
+                const SizedBox(height: 24),
+
+                // 🏗️ PHASE 4: FIELD SELECTOR (Context Switcher)
+                // Interactive Card format below weather
+                const FieldSelector().animate().fadeIn(delay: 200.ms).slideX(begin: -0.1, end: 0),
+
                 const SizedBox(height: 32),
                 
                 // ... (Rest of UI) ...
@@ -157,13 +137,13 @@ class FarmerDashboardScreen extends ConsumerWidget {
                         color: ColorPalette.textPrimary,
                       ),
                     ),
-                    Icon(Icons.arrow_forward_rounded, size: 20, color: ColorPalette.emeraldGreen),
+                    const Icon(Icons.arrow_forward_rounded, size: 20, color: ColorPalette.emeraldGreen),
                   ],
                 ),
                 const SizedBox(height: 16),
                 
                 SizedBox(
-                  height: 160,
+                  height: 200,
                   child: ListView(
                     scrollDirection: Axis.horizontal,
                     clipBehavior: Clip.none,
@@ -172,6 +152,7 @@ class FarmerDashboardScreen extends ConsumerWidget {
                       _buildCompactActionCard(
                         context,
                         title: tr('crop_doctor'),
+                        subtitle: tr('crop_doctor_desc'),
                         icon: Icons.local_hospital_rounded,
                         color: ColorPalette.rustRed,
                         onTap: () => context.push(AppRouter.cropDoctorPath),
@@ -183,6 +164,7 @@ class FarmerDashboardScreen extends ConsumerWidget {
                        _buildCompactActionCard(
                         context,
                         title: tr('yield_est'),
+                        subtitle: tr('yield_est_desc'),
                         icon: Icons.trending_up_rounded,
                         color: ColorPalette.goldenSunlight,
                         onTap: () => context.push(AppRouter.yieldPredictionPath),
@@ -194,6 +176,7 @@ class FarmerDashboardScreen extends ConsumerWidget {
                        _buildCompactActionCard(
                         context,
                         title: tr('market'),
+                        subtitle: tr('market_desc'),
                         icon: Icons.currency_rupee_rounded,
                         color: ColorPalette.emeraldGreen,
                         onTap: () {},
@@ -205,6 +188,7 @@ class FarmerDashboardScreen extends ConsumerWidget {
                        _buildCompactActionCard(
                         context,
                         title: tr('ask_expert'),
+                        subtitle: tr('ask_expert_desc'),
                         icon: Icons.support_agent_rounded,
                         color: Colors.blueAccent,
                          onTap: () {},
@@ -234,15 +218,17 @@ class FarmerDashboardScreen extends ConsumerWidget {
   Widget _buildCompactActionCard(
     BuildContext context, {
     required String title,
+    required String subtitle,
     required IconData icon,
     required Color color,
     required VoidCallback onTap,
     required int delay,
   }) {
     return SizedBox(
-      width: 130, // Fixed width for compact look
+      width: 220, // Increased from 150 to better fit local language text
       child: ActionCard(
         title: title,
+        subtitle: subtitle,
         icon: icon,
         color: color,
         onTap: onTap,

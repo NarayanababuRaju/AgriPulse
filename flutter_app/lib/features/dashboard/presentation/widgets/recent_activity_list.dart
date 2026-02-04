@@ -1,11 +1,16 @@
-import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'dart:io' as io;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_app/core/router/app_router.dart';
 import 'package:flutter_app/core/theme/color_palette.dart';
 import 'package:flutter_app/features/dashboard/presentation/providers/activity_provider.dart';
-import 'package:flutter_app/core/router/app_router.dart';
+import '../../../profile/providers/profile_provider.dart';
+import '../../../../core/api/path_enforcer.dart';
+import '../../../../core/services/local_vault.dart';
+import '../../../auth/providers/auth_provider.dart';
+import 'package:flutter_app/core/localization/language_provider.dart';
 
 /// RecentActivityList - Displays a consolidated list of recent actions (Diagnoses & Yield Predictions)
 class RecentActivityList extends ConsumerWidget {
@@ -14,6 +19,12 @@ class RecentActivityList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final activityAsync = ref.watch(dashboardActivityProvider);
+    final profileState = ref.watch(profileProvider);
+    
+    debugPrint("📋 RecentActivityList: Context -> Plot: ${profileState.selectedFieldId} | Cycle: ${profileState.activeCycleId}");
+
+    ref.watch(languageProvider); // Watch the state to trigger rebuilds on language change
+    final tr = ref.read(languageProvider.notifier);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -21,9 +32,9 @@ class RecentActivityList extends ConsumerWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
-              "Recent Activity",
-              style: TextStyle(
+            Text(
+              tr.translate('recent_activity'),
+              style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: ColorPalette.textPrimary,
@@ -31,9 +42,9 @@ class RecentActivityList extends ConsumerWidget {
             ),
             TextButton(
               onPressed: () {
-                // TODO: View all activity
+                context.push(AppRouter.activityLogPath);
               },
-              child: const Text("See All"),
+              child: Text(tr.translate('see_all')),
             ),
           ],
         ),
@@ -41,12 +52,10 @@ class RecentActivityList extends ConsumerWidget {
         activityAsync.when(
           data: (history) {
             if (history.isEmpty) {
-              return _buildEmptyState();
+              return _buildEmptyState(tr);
             }
-            // Show top 5 recent items in dashboard
-            final recentItems = history.take(5).toList();
             return Column(
-              children: recentItems.map((record) => _buildActivityItem(context, record)).toList(),
+              children: history.map((record) => _buildActivityItem(context, ref, tr, record)).toList(),
             );
           },
           loading: () => const Center(
@@ -55,14 +64,16 @@ class RecentActivityList extends ConsumerWidget {
               child: CircularProgressIndicator(),
             ),
           ),
-          error: (err, stack) => Center(child: Text("Error loading activity: $err")),
+          error: (err, stack) => Center(child: Text("${tr.translate('error_loading_activity')}: $err")),
         ),
       ],
     );
   }
 
-  Widget _buildActivityItem(BuildContext context, ActivityRecord record) {
+  Widget _buildActivityItem(BuildContext context, WidgetRef ref, LanguageNotifier tr, ActivityRecord record) {
     bool isDiagnosis = record.type == ActivityType.diagnosis;
+    final profileState = ref.watch(profileProvider);
+    final isUnassignedMode = profileState.selectedFieldId == PathEnforcer.unassignedFieldId;
     
     // Detect if this is a healthy plant diagnosis
     final bool isHealthy = isDiagnosis && (
@@ -72,7 +83,7 @@ class RecentActivityList extends ConsumerWidget {
     );
     
     // Context-aware subtitle for diagnosis
-    final String diagnosisSubtitle = isHealthy ? "Healthy Plant" : "Detected Issue";
+    final String diagnosisSubtitle = isHealthy ? tr.translate('healthy_plant') : tr.translate('detected_issue');
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -93,37 +104,51 @@ class RecentActivityList extends ConsumerWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
           onTap: () {
-            if (isDiagnosis) {
-              context.push('/diagnosis-details', extra: record.originalRecord);
+            final isLargeScreen = MediaQuery.of(context).size.width > 900;
+            if (isLargeScreen) {
+              context.push(AppRouter.activityLogPath, extra: record.id);
             } else {
-              context.push(AppRouter.yieldDetailsPath, extra: record.originalRecord);
+              if (isDiagnosis) {
+                context.push(AppRouter.diagnosisDetailsPath, extra: record.originalRecord);
+              } else {
+                context.push(AppRouter.yieldDetailsPath, extra: record.originalRecord);
+              }
             }
           },
           child: Padding(
             padding: const EdgeInsets.all(12),
             child: Row(
               children: [
-                // Crop Doctor Icon for diagnosis entries (matching Smart Tools)
-                if (isDiagnosis)
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: isHealthy ? Colors.green.shade50 : ColorPalette.rustRed.withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.local_hospital_rounded,
-                      color: isHealthy ? ColorPalette.emeraldGreen : ColorPalette.rustRed,
-                      size: 20,
-                    ),
+                // Image Thumbnail or Icon
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: isDiagnosis 
+                        ? (isHealthy ? Colors.green.shade50 : ColorPalette.rustRed.withValues(alpha: 0.1))
+                        : ColorPalette.goldenSunlight.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                
-                // Yield Icon
-                if (!isDiagnosis)
-                  _buildTypeIcon(record.type),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: (isDiagnosis && record.imagePath != null && record.imagePath!.isNotEmpty)
+                        ? (kIsWeb || record.imagePath!.startsWith('data:'))
+                            ? Image.network(
+                                record.imagePath!,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => _buildFallbackIcon(record),
+                              )
+                            : Image.file(
+                                io.File(record.imagePath!),
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => _buildFallbackIcon(record),
+                              )
+                        : _buildFallbackIcon(record),
+                  ),
+                ),
                 
                 const SizedBox(width: 12),
+                
                 
                 // Info
                 Expanded(
@@ -144,7 +169,7 @@ class RecentActivityList extends ConsumerWidget {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            isDiagnosis ? diagnosisSubtitle : "Yield Prediction",
+                            isDiagnosis ? diagnosisSubtitle : tr.translate('yield_prediction'),
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w600,
@@ -157,7 +182,8 @@ class RecentActivityList extends ConsumerWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        record.title,
+                        // Translate crop names for yield prediction, keep disease names as-is (from AI)
+                        isDiagnosis ? record.title : (record.title.contains(' - ') ? record.title : tr.translate(record.title)),
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 15,
@@ -167,19 +193,45 @@ class RecentActivityList extends ConsumerWidget {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        _formatDate(record.timestamp),
-                        style: const TextStyle(
-                          color: Colors.grey,
-                          fontSize: 10,
+                      if (!isDiagnosis)
+                        Text(
+                          '${record.subtitle} • ${_formatDate(tr, record.timestamp, ref)}',
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 10,
+                          ),
+                        )
+                      else
+                        Text(
+                          _formatDate(tr, record.timestamp, ref),
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 10,
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 ),
 
-                // Confidence / Status Badge
-                _buildBadge(record),
+                // Confidence / Status / Language Badge
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    if (!isUnassignedMode) _buildBadge(tr, record),
+                    if (record.languageCode != null) ...[
+                      const SizedBox(height: 4),
+                      _buildLanguageBadge(tr, record.languageCode!),
+                    ],
+                  ],
+                ),
+
+                // 🚚 RE-HOME ACTION (Phase 4 Addition)
+                if (isUnassignedMode)
+                  IconButton(
+                    icon: const Icon(Icons.drive_file_move_rtl_rounded, color: Colors.orange),
+                     onPressed: () => _showRehomePicker(context, ref, tr, record),
+                    tooltip: tr.translate('move_to_plot'),
+                  ),
               ],
             ),
           ),
@@ -188,67 +240,26 @@ class RecentActivityList extends ConsumerWidget {
     );
   }
 
-  Widget _buildDiagnosisIcon(bool isHealthy) {
-    return Container(
-      width: 52,
-      height: 52,
-      decoration: BoxDecoration(
-        color: isHealthy ? Colors.green.shade50 : Colors.red.shade50,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Icon(
-        isHealthy ? Icons.check_circle_outline_rounded : Icons.warning_amber_rounded,
-        color: isHealthy ? ColorPalette.emeraldGreen : ColorPalette.rustRed,
-        size: 24,
-      ),
+
+  Widget _buildFallbackIcon(ActivityRecord record) {
+    final bool isDiagnosis = record.type == ActivityType.diagnosis;
+    final bool isHealthy = isDiagnosis && (
+      record.title.toLowerCase().contains('healthy') ||
+      record.title.toLowerCase().contains('no visible disease') ||
+      record.title.toLowerCase().contains('no disease')
+    );
+
+    return Icon(
+      isDiagnosis ? Icons.local_hospital_rounded : Icons.trending_up_rounded,
+      color: isDiagnosis 
+          ? (isHealthy ? ColorPalette.emeraldGreen : ColorPalette.rustRed)
+          : ColorPalette.goldenSunlight,
+      size: 20,
     );
   }
 
-  Widget _buildThumbnail(String path) {
-    ImageProvider imageProvider;
-    if (path.startsWith("assets/")) {
-      imageProvider = AssetImage(path);
-    } else if (kIsWeb) {
-      if (path.startsWith("http") || path.startsWith("blob:")) {
-        imageProvider = NetworkImage(path);
-      } else {
-        imageProvider = const AssetImage("assets/images/logo.png");
-      }
-    } else {
-      imageProvider = FileImage(File(path));
-    }
 
-    return Container(
-      width: 52,
-      height: 52,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        image: DecorationImage(
-          image: imageProvider,
-          fit: BoxFit.cover,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTypeIcon(ActivityType type) {
-    final isYield = type == ActivityType.harvest;
-    return Container(
-      width: 36,
-      height: 36,
-      decoration: BoxDecoration(
-        color: isYield ? ColorPalette.goldenSunlight.withValues(alpha: 0.1) : Colors.blue.shade50,
-        shape: BoxShape.circle,
-      ),
-      child: Icon(
-        isYield ? Icons.trending_up_rounded : Icons.biotech_outlined,
-        color: isYield ? ColorPalette.goldenSunlight : Colors.blue,
-        size: 20,
-      ),
-    );
-  }
-
-  Widget _buildBadge(ActivityRecord record) {
+  Widget _buildBadge(LanguageNotifier tr, ActivityRecord record) {
     final isHealthy = record.title.toLowerCase().contains("healthy");
     final isYield = record.type == ActivityType.harvest;
     
@@ -261,7 +272,7 @@ class RecentActivityList extends ConsumerWidget {
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
-        isYield ? "PREDICTION" : "${(record.confidence * 100).toInt()}% CONF",
+        isYield ? tr.translate('yield_prediction') : "${(record.confidence * 100).toInt()}% CONF",
         style: TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.bold,
@@ -271,22 +282,24 @@ class RecentActivityList extends ConsumerWidget {
     );
   }
 
-  String _formatDate(DateTime date) {
+  String _formatDate(LanguageNotifier tr, DateTime date, WidgetRef ref) {
     final now = DateTime.now();
     final difference = now.difference(date);
     if (difference.inDays == 0) {
       if (difference.inHours == 0) {
-        return "${difference.inMinutes}m ago";
+        return "${difference.inMinutes}${tr.translate('m_ago')}";
       }
-      return "${difference.inHours}h ago";
+      return "${difference.inHours}${tr.translate('h_ago')}";
     } else if (difference.inDays == 1) {
-      return "Yesterday";
+      return tr.translate('yesterday');
     } else {
-      return "${date.day}/${date.month}/${date.year}";
+      final months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+      final monthKey = months[date.month - 1];
+      return "${date.day} ${tr.translate(monthKey)} ${date.year}";
     }
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(LanguageNotifier tr) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(32),
@@ -299,21 +312,103 @@ class RecentActivityList extends ConsumerWidget {
         children: [
           Icon(Icons.history_toggle_off_rounded, size: 64, color: Colors.grey.shade200),
           const SizedBox(height: 16),
-          const Text(
-            "No activity yet",
-            style: TextStyle(
+          Text(
+            tr.translate('no_activity_yet'),
+            style: const TextStyle(
               color: ColorPalette.textSecondary,
               fontWeight: FontWeight.w600,
               fontSize: 16,
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
-            "Start a crop scan or yield prediction to see history",
+          Text(
+            tr.translate('start_scan_prediction_hint'),
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.grey, fontSize: 13),
+            style: const TextStyle(color: Colors.grey, fontSize: 13),
           ),
         ],
+      ),
+    );
+  }
+  void _showRehomePicker(BuildContext context, WidgetRef ref, LanguageNotifier tr, ActivityRecord record) {
+    final profileState = ref.read(profileProvider);
+    final activePlots = profileState.fields.where((f) => f.id != PathEnforcer.unassignedFieldId).toList();
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(tr.translate('move_record_to_plot'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text(tr.translate('select_destination_plot')),
+            const SizedBox(height: 16),
+            ...activePlots.map((plot) => ListTile(
+              leading: const Icon(Icons.landscape_rounded, color: ColorPalette.emeraldGreen),
+              title: Text(plot.name),
+              subtitle: Text(plot.soilType),
+              onTap: () async {
+                final authState = ref.read(authStateProvider);
+                final userId = authState.value?.id ?? "anonymous";
+                final vault = LocalVault();
+                final oldKey = PathEnforcer.localCompositeKey(
+                  userId: userId,
+                  fieldId: PathEnforcer.unassignedFieldId, 
+                  cycleId: PathEnforcer.defaultCycleId, 
+                  activityId: record.id
+                );
+                
+                await vault.rehomeRecord(
+                  oldKey, 
+                  userId: userId,
+                  fieldId: plot.id, 
+                  cycleId: PathEnforcer.defaultCycleId
+                );
+                ref.invalidate(dashboardActivityProvider);
+                if (context.mounted) Navigator.pop(context);
+                
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("${tr.translate('moved_successfully')} (${plot.name})"))
+                  );
+                }
+              },
+            )),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLanguageBadge(LanguageNotifier tr, String languageCode) {
+    String label = languageCode.toUpperCase();
+    final Map<String, String> langMap = {
+      'hi': 'Hindi',
+      'ta': 'Tamil',
+      'kn': 'Kannada',
+      'te': 'Telugu',
+      'ml': 'Malayalam',
+      'en': 'English'
+    };
+    label = langMap[languageCode] ?? label;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        "${tr.translate('scan_in')} $label",
+        style: TextStyle(
+          fontSize: 8,
+          fontWeight: FontWeight.w500,
+          color: Colors.grey.shade600,
+        ),
       ),
     );
   }
