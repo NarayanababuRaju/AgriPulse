@@ -3,7 +3,9 @@ import 'package:flutter/foundation.dart';
 import '../constants/hive_constants.dart';
 import '../../features/crop_diagnosis/models/diagnosis_record.dart';
 import '../../features/yield_prediction/models/yield_record.dart';
+import '../../features/profile/domain/entities/field.dart';
 import '../models/weather_cache.dart';
+import '../api/path_enforcer.dart';
 
 class LocalVault {
   static final LocalVault _instance = LocalVault._internal();
@@ -29,10 +31,6 @@ class LocalVault {
       debugPrint("📦 LocalVault: Opening Settings Box...");
       _settingsBox = await Hive.openBox(HiveConstants.settingsBox);
       
-      // Inject Demo Data (One-time check logic inside)
-      debugPrint("🚀 LocalVault: Checking Demo Data...");
-      await populateDemoData();
-      
       debugPrint("✅ LocalVault initialized successfully.");
     } catch (e) {
       debugPrint("❌ Failed to initialize LocalVault: $e");
@@ -56,36 +54,105 @@ class LocalVault {
     }
   }
 
-  // --- Diagnosis Operations ---
+  // --- Diagnosis Operations (Hierarchical) ---
   
-  Future<void> saveDiagnosis(DiagnosisRecord record) async {
-    await _diagnosisBox.put(record.id, record);
-    debugPrint("💾 Application Saved Diagnosis: ${record.id}");
+  Future<void> saveDiagnosis(DiagnosisRecord record, {required String userId, required String fieldId, required String cycleId}) async {
+    final key = PathEnforcer.localCompositeKey(
+      userId: userId,
+      fieldId: fieldId, 
+      cycleId: cycleId, 
+      activityId: record.id
+    );
+    await _diagnosisBox.put(key, record);
+    debugPrint("💾 (H) Saved Diagnosis with key: $key");
   }
 
-  List<DiagnosisRecord> getHistory() {
+  List<DiagnosisRecord> getHistory({required String userId, String? fieldId, String? cycleId}) {
     try {
-      return _diagnosisBox.values.toList()..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+      final allValues = _diagnosisBox.values.toList();
+      debugPrint("📦 LocalVault: Reading diagnosis history for $userId. Total box entries: ${allValues.length}");
+      
+      // If no context provided, return all for this user
+      if (fieldId == null || cycleId == null) {
+        return _diagnosisBox.toMap().entries
+            .where((e) => e.key.toString().startsWith('${userId}_'))
+            .map((e) => e.value)
+            .toList()
+            ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+      }
+
+      debugPrint("🔍 LocalVault: Filtering for context: ${userId}_${fieldId}_$cycleId");
+      
+      // Prefix Filtering for specific Plot/Season and User
+      final filtered = _diagnosisBox.toMap().entries
+          .where((e) => PathEnforcer.matchesContext(e.key.toString(), userId, fieldId, cycleId))
+          .map((e) => e.value)
+          .toList();
+      
+      debugPrint("✅ LocalVault: Found ${filtered.length} matching records.");
+      
+      return filtered..sort((a, b) => b.timestamp.compareTo(a.timestamp));
     } catch (e) {
-      debugPrint("❌ Error reading diagnosis history: $e");
+      debugPrint("❌ Error reading hierarchical diagnosis history: $e");
       return [];
     }
   }
 
-  // --- Yield Operations ---
-
-  Future<void> saveYield(YieldRecord record) async {
-    await _yieldBox.put(record.id, record);
-    debugPrint("💾 Application Saved Yield Prediction: ${record.id}");
+  /// Re-home unassigned legacy data to a specific field/cycle
+  Future<void> rehomeRecord(String oldKey, {required String userId, required String fieldId, required String cycleId}) async {
+    final record = _diagnosisBox.get(oldKey);
+    if (record != null) {
+      await saveDiagnosis(record, userId: userId, fieldId: fieldId, cycleId: cycleId);
+      await _diagnosisBox.delete(oldKey);
+      debugPrint("🚚 Re-homed record $oldKey to $userId/$fieldId/$cycleId");
+    }
   }
 
-  List<YieldRecord> getYieldHistory() {
+  /// Delete a specific diagnosis record
+  Future<void> deleteDiagnosisRecord(String key) async {
+    await _diagnosisBox.delete(key);
+    debugPrint("🗑️ LocalVault: Deleted Diagnosis record with key: $key");
+  }
+
+  // --- Yield Operations (Hierarchical) ---
+
+  Future<void> saveYield(YieldRecord record, {required String userId, required String fieldId, required String cycleId}) async {
+    final key = PathEnforcer.localCompositeKey(
+      userId: userId,
+      fieldId: fieldId, 
+      cycleId: cycleId, 
+      activityId: record.id
+    );
+    await _yieldBox.put(key, record);
+    debugPrint("💾 (H) Saved Yield Prediction with key: $key");
+  }
+
+  List<YieldRecord> getYieldHistory({required String userId, String? fieldId, String? cycleId}) {
     try {
-      return _yieldBox.values.toList()..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+      
+      if (fieldId == null || cycleId == null) {
+        return _yieldBox.toMap().entries
+            .where((e) => e.key.toString().startsWith('${userId}_'))
+            .map((e) => e.value)
+            .toList()
+            ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+      }
+
+      return _yieldBox.toMap().entries
+          .where((e) => PathEnforcer.matchesContext(e.key.toString(), userId, fieldId, cycleId))
+          .map((e) => e.value)
+          .toList()
+          ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
     } catch (e) {
-      debugPrint("❌ Error reading yield history: $e");
+      debugPrint("❌ Error reading hierarchical yield history: $e");
       return [];
     }
+  }
+
+  /// Delete a specific yield record
+  Future<void> deleteYieldRecord(String key) async {
+    await _yieldBox.delete(key);
+    debugPrint("🗑️ LocalVault: Deleted Yield record with key: $key");
   }
 
   // --- Settings & User Session ---
@@ -106,6 +173,42 @@ class LocalVault {
     debugPrint("🗑️ User Session Cleared.");
   }
 
+  // --- Language Preference ---
+
+  Future<void> saveLanguage(String languageCode) async {
+    await _settingsBox.put('selected_language', languageCode);
+    debugPrint("💾 Language preference saved: $languageCode");
+  }
+
+  String? getSavedLanguage() {
+    return _settingsBox.get('selected_language');
+  }
+
+  // --- Field Operations (Scoped by User) ---
+
+  Future<void> saveFields(String userId, List<Field> fields) async {
+    await _settingsBox.put('fields_$userId', fields.map((f) => f.toJson()).toList());
+    debugPrint("💾 LocalVault: Saved ${fields.length} fields for user $userId");
+  }
+
+  List<Field> getFields(String userId) {
+    final data = _settingsBox.get('fields_$userId');
+    if (data == null) {
+      debugPrint("📦 LocalVault: No fields found for user $userId");
+      return [];
+    }
+    final rawList = List<dynamic>.from(data);
+    return rawList.map((f) => Field.fromJson(Map<String, dynamic>.from(f))).toList();
+  }
+
+  Future<void> saveSelectedFieldId(String userId, String fieldId) async {
+    await _settingsBox.put('selected_id_$userId', fieldId);
+  }
+
+  String? getSelectedFieldId(String userId) {
+    return _settingsBox.get('selected_id_$userId');
+  }
+
   // --- Weather Operations ---
 
   Future<void> cacheWeather(String locationKey, String jsonData) async {
@@ -122,42 +225,27 @@ class LocalVault {
     return _weatherBox.get(locationKey);
   }
 
-  // --- Demo Data Injection ---
+  Future<void> clearHistory({required String userId, required String fieldId, required String cycleId}) async {
+    try {
+      debugPrint("🗑️ LocalVault: Clearing history for context: ${userId}_${fieldId}_$cycleId");
+      
+      // Clear Diagnosis
+      final diagnosisKeysToDelete = _diagnosisBox.keys
+          .where((k) => PathEnforcer.matchesContext(k.toString(), userId, fieldId, cycleId))
+          .toList();
+      await _diagnosisBox.deleteAll(diagnosisKeysToDelete);
+      debugPrint("Deleted ${diagnosisKeysToDelete.length} diagnosis records.");
 
-  Future<void> populateDemoData() async {
-    if (_diagnosisBox.isNotEmpty) return; // Only populate if empty
-
-    debugPrint("🚀 Injecting Demo Data for Hackathon...");
-
-    final demoRecords = [
-      DiagnosisRecord(
-        id: "demo_1",
-        imagePath: "assets/images/onion_datasets/Healthy leaves/100_jpg.rf.3074e710a4f19cc2252c0c83ec3bd651.jpg", 
-        diseaseName: "Healthy Onion",
-        confidence: 0.98,
-        treatmentSummary: "Crop is in excellent condition. Continue current irrigation schedule.",
-        timestamp: DateTime.now().subtract(const Duration(days: 2)),
-        farmerInput: "Checking daily health. No visible spots.",
-        refinementReasoning: "Visual assessment confirms healthy green tissue with no discoloration or lesions.",
-        treatmentAdjustment: null, 
-      ),
-      DiagnosisRecord(
-        id: "demo_2",
-        imagePath: "assets/images/onion_datasets/Purple blotch/dr_0_1204.jpg",
-        diseaseName: "Purple Blotch",
-        confidence: 0.92,
-        treatmentSummary: "Apply Mancozeb 75% WP @ 2g/liter. Avoid overhead irrigation.",
-        timestamp: DateTime.now().subtract(const Duration(days: 5)),
-        farmerInput: "Spots appeared after heavy rain last week. Worried about spread.",
-        refinementReasoning: "High humidity reported by farmer correlates with purple blotch fungal sporulation.",
-        treatmentAdjustment: "Added emphasis on avoiding overhead irrigation due to farmer's report of recent rain.",
-      ),
-    ];
-
-    for (var record in demoRecords) {
-      await _diagnosisBox.put(record.id, record);
+      // Clear Yield
+      final yieldKeysToDelete = _yieldBox.keys
+          .where((k) => PathEnforcer.matchesContext(k.toString(), userId, fieldId, cycleId))
+          .toList();
+      await _yieldBox.deleteAll(yieldKeysToDelete);
+      debugPrint("Deleted ${yieldKeysToDelete.length} yield records.");
+      
+    } catch (e) {
+      debugPrint("❌ Error clearing history: $e");
     }
-    
-    debugPrint("✅ Demo Data Injected: ${demoRecords.length} records.");
   }
+
 }

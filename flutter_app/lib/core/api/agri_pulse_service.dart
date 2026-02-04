@@ -1,9 +1,10 @@
-import 'dart:io';
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http_parser/http_parser.dart'; // For MediaType
+import 'dart:math' as math;
+import '../../features/profile/providers/profile_provider.dart';
 
 import 'api_client.dart';
 
@@ -12,42 +13,94 @@ import 'api_client.dart';
 /// Handles all backend communication for Crop Diagnosis and User Data.
 class AgriPulseService {
   final Dio _dio;
+  final Ref _ref;
+  
+  AgriPulseService(this._dio, this._ref);
 
-  AgriPulseService(this._dio);
-
-  /// Analyze Crop Image
+  /// Analyze Crop Image (Hierarchical AI Implementation)
   /// 
-  /// Uploads an image to the backend for Gemini 3 diagnosis.
-  Future<Map<String, dynamic>> analyzeCrop(XFile imageFile, String farmerId, String voiceTranscription, {Map<String, dynamic>? weatherContext, String? languageCode}) async {
+  /// Converts photo to base64, grounds prompt in plot metadata, 
+  /// and executes Gemini 2.5 call with exponential backoff.
+  Future<Map<String, dynamic>> analyzeCrop(
+    XFile imageFile, 
+    String farmerId, 
+    String voiceTranscription, 
+    {Map<String, dynamic>? weatherContext, 
+    String? languageCode,
+    String? irrigationStage,
+    String? soilMoisture,
+    String? weatherEvent,
+    String? spreadPattern,
+    String? lastTreatment,
+    String? dosage,
+    }) async {
     try {
-      String fileName = imageFile.path.split('/').last;
-      
-      // Read bytes directly for web compatibility
-      final bytes = await imageFile.readAsBytes();
-      
-      FormData formData = FormData.fromMap({
-        "image": MultipartFile.fromBytes(
-          bytes,
-          filename: fileName,
-          contentType: MediaType('image', 'jpeg'),
-        ),
-        "farmer_id": farmerId,
-        "voice_transcription": voiceTranscription,
-        if (weatherContext != null) "weather_context": jsonEncode(weatherContext), 
-        if (languageCode != null) "language": languageCode,
+      return await _withRetry(() async {
+        // 1. Resolve Hierarchical Context automatically
+        final profile = _ref.read(profileProvider);
+        final activeField = profile.selectedField;
+        final activeCycleId = profile.activeCycleId;
+        
+        final String fieldId = activeField?.id ?? "unassigned_field";
+        final String cycleId = activeCycleId ?? "default_cycle";
+        final double acreage = activeField?.acreage ?? 1.0;
+        final String soilType = activeField?.soilType ?? "Unknown";
+
+        // 2. Prepare MultiModal Payload for Backend
+        final bytes = await imageFile.readAsBytes();
+        
+        FormData formData = FormData.fromMap({
+          "farmer_id": farmerId,
+          "field_id": fieldId,
+          "cycle_id": cycleId,
+          "image": MultipartFile.fromBytes(bytes, filename: "crop.jpg", contentType: MediaType("image", "jpeg")),
+          "voice_transcription": voiceTranscription,
+          "acreage": acreage,
+          "soil_type": soilType,
+          if (weatherContext != null) "weather_context": jsonEncode(weatherContext),
+          if (languageCode != null) "language": languageCode,
+          if (irrigationStage != null) "irrigation_stage": irrigationStage,
+          if (soilMoisture != null) "soil_moisture": soilMoisture,
+          if (weatherEvent != null) "weather_event": weatherEvent,
+          if (spreadPattern != null) "spread_pattern": spreadPattern,
+          if (lastTreatment != null) "last_treatment": lastTreatment,
+          if (dosage != null) "dosage": dosage,
+        });
+
+      // 3. Call Backend API (instead of direct Gemini)
+      // This ensures hierarchical persistence and prompt grounding in the backend
+        final response = await _dio.post(
+          '/api/crop/analyze',
+          data: formData,
+        );
+
+        return response.data;
       });
-
-      final response = await _dio.post(
-        '/api/crop/analyze', // Corrected endpoint
-        data: formData,
-      );
-
-      return response.data;
     } catch (e) {
-      if (e is DioException) {
-        throw Exception("API Error: ${e.message}");
+       if (e is DioException) {
+         throw Exception("API Error: ${e.response?.data?['detail'] ?? e.message}");
+       }
+       throw Exception("Analysis failed: $e");
+    }
+  }
+
+  /// Exponential Backoff Retry Utility
+  Future<T> _withRetry<T>(Future<T> Function() action) async {
+    int retries = 0;
+    int maxRetries = 5;
+    
+    while (true) {
+      try {
+        return await action();
+      } catch (e) {
+        retries++;
+        if (retries >= maxRetries) {
+          rethrow;
+        }
+        // Wait: 2s, 4s, 8s, 16s...
+        final waitSeconds = math.pow(2, retries).toInt();
+        await Future.delayed(Duration(seconds: waitSeconds));
       }
-      throw Exception("Upload failed: $e");
     }
   }
   /// Get Weather Forecast (7-Day)
@@ -113,7 +166,7 @@ class AgriPulseService {
       return response.data;
     } catch (e) {
       if (e is DioException) {
-        throw Exception("Speech synthesis failed: ${e.message}");
+        throw Exception("API Error: ${e.response?.data?['detail'] ?? e.message}");
       }
       throw Exception("Speech fetch failed: $e");
     }
@@ -133,8 +186,14 @@ class AgriPulseService {
     String? language,
   }) async {
     try {
+      final profile = _ref.read(profileProvider);
+      final fieldId = profile.selectedFieldId ?? "unassigned_field";
+      final cycleId = profile.activeCycleId ?? "default_cycle";
+
       FormData formData = FormData.fromMap({
         "farmer_id": farmerId,
+        "field_id": fieldId,
+        "cycle_id": cycleId,
         "crop_name": cropName,
         "field_area": fieldArea,
         "planted_date": plantedDate,
@@ -152,7 +211,7 @@ class AgriPulseService {
       return response.data;
     } catch (e) {
       if (e is DioException) {
-        throw Exception("Yield prediction failed: ${e.message}");
+        throw Exception("API Error: ${e.response?.data?['detail'] ?? e.message}");
       }
       throw Exception("Yield prediction failed: $e");
     }
@@ -176,7 +235,7 @@ class AgriPulseService {
       return response.data['translation'];
     } catch (e) {
       if (e is DioException) {
-        throw Exception("Translation failed: ${e.message}");
+        throw Exception("API Error: ${e.response?.data?['detail'] ?? e.message}");
       }
       throw Exception("Translation failed: $e");
     }
@@ -190,23 +249,31 @@ class AgriPulseService {
     required Map<String, dynamic> originalDiagnosis,
     required String feedback,
     required Map<String, dynamic> contextOverrides,
+    List<Map<String, dynamic>>? interactionHistory,
     String? language,
   }) async {
     try {
+      final profile = _ref.read(profileProvider);
+      final fieldId = profile.selectedFieldId ?? "unassigned_field";
+      final cycleId = profile.activeCycleId ?? "default_cycle";
+
       final response = await _dio.post(
         '/api/crop/refine',
         data: {
           "farmer_id": farmerId,
+          "field_id": fieldId,
+          "cycle_id": cycleId,
           "original_diagnosis": originalDiagnosis,
           "farmer_feedback": feedback,
           "context_overrides": contextOverrides,
+          "interaction_history": interactionHistory,
           "language": language,
         },
       );
       return response.data;
     } catch (e) {
       if (e is DioException) {
-        throw Exception("Refinement failed: ${e.message}");
+        throw Exception("API Error: ${e.response?.data?['detail'] ?? e.message}");
       }
       throw Exception("Refinement failed: $e");
     }
@@ -215,5 +282,5 @@ class AgriPulseService {
 
 final agriPulseServiceProvider = Provider<AgriPulseService>((ref) {
   final dio = ref.watch(apiClientProvider);
-  return AgriPulseService(dio);
+  return AgriPulseService(dio, ref);
 });
