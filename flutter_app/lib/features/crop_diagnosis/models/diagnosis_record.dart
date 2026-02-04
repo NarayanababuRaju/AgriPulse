@@ -1,4 +1,5 @@
 import 'package:hive/hive.dart';
+import 'thread_item.dart';
 
 class DiagnosisRecord {
   final String id;
@@ -10,6 +11,26 @@ class DiagnosisRecord {
   final String? farmerInput;
   final String? refinementReasoning;
   final String? treatmentAdjustment;
+  final String? severity; // High, Medium, Low
+  final double? temperature;
+  final double? humidity;
+  final String? cropName;
+  final String? languageCode;
+  
+  // Collaborative Workspace Context (Phase 20)
+  final String? irrigationStage;
+  final String? soilMoisture;
+  final String? weatherEvent;
+  final String? spreadPattern;
+  final String? lastTreatment;
+  final String? dosage;
+  
+  // Phase 24.1: Permanent Initial Markers (Bulletproof extraction)
+  final String? initialUserInput;
+  final String? initialAiResponse;
+  
+  // Phase 24: Recursive Thread
+  final List<ThreadItem>? thread;
 
   DiagnosisRecord({
     required this.id,
@@ -21,6 +42,20 @@ class DiagnosisRecord {
     this.farmerInput,
     this.refinementReasoning,
     this.treatmentAdjustment,
+    this.severity,
+    this.temperature,
+    this.humidity,
+    this.cropName,
+    this.languageCode,
+    this.irrigationStage,
+    this.soilMoisture,
+    this.weatherEvent,
+    this.spreadPattern,
+    this.lastTreatment,
+    this.dosage,
+    this.initialUserInput,
+    this.initialAiResponse,
+    this.thread,
   });
 }
 
@@ -40,21 +75,58 @@ class DiagnosisRecordAdapter extends TypeAdapter<DiagnosisRecord> {
     String? farmerInput;
     String? refinementReasoning;
     String? treatmentAdjustment;
+    String? severity;
+    double? temperature;
+    double? humidity;
+    String? cropName;
+    String? languageCode;
+    String? irrigationStage;
+    String? soilMoisture;
+    String? weatherEvent;
+    String? spreadPattern;
+    String? lastTreatment;
+    String? dosage;
+    String? initialUserInput;
+    String? initialAiResponse;
+    List<ThreadItem>? thread;
 
-    // Check availability of optional fields via boolean flags if we wrote them that way.
-    // BUT since we are appending to an existing structure that didn't have flags,
-    // we must assume the structure is:
-    // [Legacy Fields] + [Optional Fields]
-    // If the box contains legacy data, the reader might be at the end.
-    // However, Hive Reader doesn't expose `availableBytes`.
-    
-    // STRATEGY: 
-    // Since this is a Hackathon and we are in dev, we will wrap the read of new fields
-    // in a try-catch block. If readBool/readString fails (EOF), it means it's an old record.
+    // Check availability of optional fields via boolean flags
     try {
         if (reader.readBool()) farmerInput = reader.readString();
         if (reader.readBool()) refinementReasoning = reader.readString();
         if (reader.readBool()) treatmentAdjustment = reader.readString();
+        if (reader.readBool()) severity = reader.readString();
+        if (reader.readBool()) temperature = reader.readDouble();
+        if (reader.readBool()) humidity = reader.readDouble();
+        if (reader.readBool()) cropName = reader.readString();
+        if (reader.readBool()) languageCode = reader.readString();
+        
+        // Phase 20 Fields
+        if (reader.readBool()) irrigationStage = reader.readString();
+        if (reader.readBool()) soilMoisture = reader.readString();
+        if (reader.readBool()) weatherEvent = reader.readString();
+        if (reader.readBool()) spreadPattern = reader.readString();
+        if (reader.readBool()) lastTreatment = reader.readString();
+        if (reader.readBool()) dosage = reader.readString();
+        
+        // Phase 24.1
+        if (reader.readBool()) initialUserInput = reader.readString();
+        if (reader.readBool()) initialAiResponse = reader.readString();
+        
+        // Phase 24
+        if (reader.readBool()) {
+           int count = reader.readInt();
+           thread = [];
+           for (var i=0; i < count; i++) {
+             final item = reader.read();
+             if (item is ThreadItem) {
+               thread.add(item);
+             } else if (item is Map) {
+               // Handle legacy Map format
+               thread.add(ThreadItem.fromMap(Map<String, dynamic>.from(item)));
+             }
+           }
+        }
     } catch (e) {
         // End of stream likely reached (Legacy Record)
     }
@@ -69,6 +141,20 @@ class DiagnosisRecordAdapter extends TypeAdapter<DiagnosisRecord> {
       farmerInput: farmerInput,
       refinementReasoning: refinementReasoning,
       treatmentAdjustment: treatmentAdjustment,
+      severity: severity,
+      temperature: temperature,
+      humidity: humidity,
+      cropName: cropName,
+      languageCode: languageCode,
+      irrigationStage: irrigationStage,
+      soilMoisture: soilMoisture,
+      weatherEvent: weatherEvent,
+      spreadPattern: spreadPattern,
+      lastTreatment: lastTreatment,
+      dosage: dosage,
+      initialUserInput: initialUserInput,
+      initialAiResponse: initialAiResponse,
+      thread: thread,
     );
   }
 
@@ -90,6 +176,55 @@ class DiagnosisRecordAdapter extends TypeAdapter<DiagnosisRecord> {
     
     writer.writeBool(obj.treatmentAdjustment != null);
     if (obj.treatmentAdjustment != null) writer.writeString(obj.treatmentAdjustment!);
+
+    writer.writeBool(obj.severity != null);
+    if (obj.severity != null) writer.writeString(obj.severity!);
+
+    writer.writeBool(obj.temperature != null);
+    if (obj.temperature != null) writer.writeDouble(obj.temperature!);
+
+    writer.writeBool(obj.humidity != null);
+    if (obj.humidity != null) writer.writeDouble(obj.humidity!);
+    
+    writer.writeBool(obj.cropName != null);
+    if (obj.cropName != null) writer.writeString(obj.cropName!);
+
+    writer.writeBool(obj.languageCode != null);
+    if (obj.languageCode != null) writer.writeString(obj.languageCode!);
+
+    // Phase 20 Fields
+    writer.writeBool(obj.irrigationStage != null);
+    if (obj.irrigationStage != null) writer.writeString(obj.irrigationStage!);
+    
+    writer.writeBool(obj.soilMoisture != null);
+    if (obj.soilMoisture != null) writer.writeString(obj.soilMoisture!);
+    
+    writer.writeBool(obj.weatherEvent != null);
+    if (obj.weatherEvent != null) writer.writeString(obj.weatherEvent!);
+    
+    writer.writeBool(obj.spreadPattern != null);
+    if (obj.spreadPattern != null) writer.writeString(obj.spreadPattern!);
+    
+    writer.writeBool(obj.lastTreatment != null);
+    if (obj.lastTreatment != null) writer.writeString(obj.lastTreatment!);
+    
+    writer.writeBool(obj.dosage != null);
+    if (obj.dosage != null) writer.writeString(obj.dosage!);
+    
+    // Phase 24.1
+    writer.writeBool(obj.initialUserInput != null);
+    if (obj.initialUserInput != null) writer.writeString(obj.initialUserInput!);
+    
+    writer.writeBool(obj.initialAiResponse != null);
+    if (obj.initialAiResponse != null) writer.writeString(obj.initialAiResponse!);
+    
+    // Phase 24
+    writer.writeBool(obj.thread != null);
+    if (obj.thread != null) {
+      writer.writeInt(obj.thread!.length);
+      for (var item in obj.thread!) {
+        writer.write(item);
+      }
+    }
   }
 }
-
