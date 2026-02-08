@@ -127,17 +127,26 @@ class FieldSelector extends ConsumerWidget {
                     ],
                   ),
                   
-                  // Delete Button (Small, contextual) - Only for inactive, user fields
-                  if (!isUnassigned && !isSelected) ...[
+                  // Delete Button - Show for all user-created plots
+                  if (!isUnassigned) ...[
                     const SizedBox(width: 8),
                     InkWell(
-                      onTap: () => _confirmDelete(context, ref, field.id, l10n),
+                      onTap: () => _confirmDelete(
+                        context, 
+                        ref, 
+                        field.id, 
+                        field.name,
+                        l10n,
+                        isOnlyPlot: profileState.fields.length == 1,
+                      ),
                       child: Padding(
                         padding: const EdgeInsets.all(4.0),
                         child: Icon(
                           Icons.delete_outline_rounded,
                           size: 18,
-                          color: Colors.grey.shade400,
+                          color: isSelected 
+                            ? ColorPalette.rustRed.withValues(alpha: 0.6)
+                            : Colors.grey.shade400,
                         ),
                       ),
                     ),
@@ -155,25 +164,90 @@ class FieldSelector extends ConsumerWidget {
     return name == "Unassigned / Legacy Data" || name == "unassigned_field";
   }
 
-  void _confirmDelete(BuildContext context, WidgetRef ref, String fieldId, dynamic l10n) {
-     showDialog(
+  void _confirmDelete(
+    BuildContext context, 
+    WidgetRef ref, 
+    String fieldId, 
+    String plotName,
+    dynamic l10n,
+    {bool isOnlyPlot = false}
+  ) {
+    showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(l10n.translate('delete_plot')),
-        content: Text(l10n.translate('delete_plot_confirm')),
+        title: Row(
+          children: [
+            Icon(
+              isOnlyPlot ? Icons.warning_amber_rounded : Icons.delete_outline_rounded,
+              color: ColorPalette.rustRed,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                l10n.translate('delete_plot'),
+                style: const TextStyle(fontSize: 18),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              isOnlyPlot
+                ? l10n.translate('delete_only_plot_warning')
+                : l10n.translate('delete_plot_confirm'),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.grass_rounded, size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      plotName,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (isOnlyPlot) ...[
+              const SizedBox(height: 12),
+              Text(
+                l10n.translate('redirect_to_setup_hint'),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade600,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: Text(l10n.translate('cancel')),
           ),
           TextButton(
-            onPressed: () {
-              ref.read(profileProvider.notifier).removeField(fieldId);
-              Navigator.pop(context);
+            onPressed: () async {
+              await ref.read(profileProvider.notifier).removeField(fieldId);
+              if (context.mounted) {
+                Navigator.pop(context);
+                // If this was the only plot, router will auto-redirect to field registration
+              }
             },
             child: Text(
               l10n.translate('delete'), 
-              style: const TextStyle(color: Colors.red)
+              style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)
             ),
           ),
         ],

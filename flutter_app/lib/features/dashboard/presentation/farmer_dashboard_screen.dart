@@ -51,166 +51,313 @@ class FarmerDashboardScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: ColorPalette.offWhite,
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const OfflineBanner(),
-                const SizedBox(height: 12),
-                // ... (Header) ...
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "${tr('hello')},", 
-                          style: GoogleFonts.outfit(
-                            fontSize: 16,
-                            color: ColorPalette.textSecondary,
-                          ),
-                        ),
-                        Text(
-                          activeField != null && activeField.id != PathEnforcer.unassignedFieldId
-                            ? "${user?.name ?? "Raju"} • ${activeField.name}"
-                            : user?.name ?? "Raju", 
-                          style: GoogleFonts.outfit(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: ColorPalette.textPrimary,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Row(
-                      children: [
-                        const LanguageSelector(
-                          textColor: ColorPalette.textPrimary,
-                        ),
-                        const SizedBox(width: 12),
-                        _buildProfileButton(context, ref),
-                      ],
-                    ),
-                  ],
-                ),
-                
-                const SizedBox(height: 24),
-
-                // WEATHER HERO CARD
-                WeatherCard(
-                  isLoading: weatherState.isLoading,
-                  condition: weather?['condition'] ?? "Sunny",
-                  temperature: (weather?['temperature'] as num?)?.toInt() ?? 28,
-                  location: weather?['location'] ?? "Namakkal, Tamil Nadu",
-                  date: DateTime.now(),
-                ).animate()
-                    .fadeIn(duration: 600.ms)
-                    .slideY(begin: 0.1, end: 0, curve: Curves.easeOut),
-
-                const SizedBox(height: 24),
-
-                // 🏗️ PHASE 4: FIELD SELECTOR (Context Switcher)
-                // Interactive Card format below weather
-                const FieldSelector().animate().fadeIn(delay: 200.ms).slideX(begin: -0.1, end: 0),
-
-                const SizedBox(height: 32),
-                
-                // ... (Rest of UI) ...
-
-                
-                const SizedBox(height: 32),
-                
-                // ============================================
-                // ACTION LIST (Trendy Horizontal Scroll)
-                // ============================================
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      tr('smart_tools'), // Updated Header
-                      style: GoogleFonts.outfit(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: ColorPalette.textPrimary,
-                      ),
-                    ),
-                    const Icon(Icons.arrow_forward_rounded, size: 20, color: ColorPalette.emeraldGreen),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                
-                SizedBox(
-                  height: 200,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    clipBehavior: Clip.none,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // FIXED HEADER (Greeting, Language, Profile)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                   const OfflineBanner(),
+                   const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // CROP DOCTOR (Primary Feature)
-                      _buildCompactActionCard(
-                        context,
-                        title: tr('crop_doctor'),
-                        subtitle: tr('crop_doctor_desc'),
-                        icon: Icons.local_hospital_rounded,
-                        color: ColorPalette.rustRed,
-                        onTap: () => context.push(AppRouter.cropDoctorPath),
-                        delay: 200,
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "${tr('hello')},", 
+                            style: GoogleFonts.outfit(
+                              fontSize: 16,
+                              color: ColorPalette.textSecondary,
+                            ),
+                          ),
+                          Text(
+                            activeField != null && activeField.id != PathEnforcer.unassignedFieldId
+                              ? "${user?.name ?? "Raju"} • ${activeField.name}"
+                              : user?.name ?? "Raju", 
+                            style: GoogleFonts.outfit(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: ColorPalette.textPrimary,
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 16),
-
-                      // YIELD PREDICTOR
-                       _buildCompactActionCard(
-                        context,
-                        title: tr('yield_est'),
-                        subtitle: tr('yield_est_desc'),
-                        icon: Icons.trending_up_rounded,
-                        color: ColorPalette.goldenSunlight,
-                        onTap: () => context.push(AppRouter.yieldPredictionPath),
-                        delay: 300,
-                      ),
-                      const SizedBox(width: 16),
-
-                      // MARKET PRICES
-                       _buildCompactActionCard(
-                        context,
-                        title: tr('market'),
-                        subtitle: tr('market_desc'),
-                        icon: Icons.currency_rupee_rounded,
-                        color: ColorPalette.emeraldGreen,
-                        onTap: () {},
-                        delay: 400,
-                      ),
-                      const SizedBox(width: 16),
-                      
-                      // EXPERT HELP
-                       _buildCompactActionCard(
-                        context,
-                        title: tr('ask_expert'),
-                        subtitle: tr('ask_expert_desc'),
-                        icon: Icons.support_agent_rounded,
-                        color: Colors.blueAccent,
-                         onTap: () {},
-                        delay: 500,
+                      Row(
+                        children: [
+                          const LanguageSelector(
+                            textColor: ColorPalette.textPrimary,
+                          ),
+                          const SizedBox(width: 12),
+                          _buildProfileButton(context, ref),
+                        ],
                       ),
                     ],
                   ),
-                ),
-                
-                const SizedBox(height: 32),
-                
-                // ============================================
-                // RECENT ACTIVITY
-                // ============================================
-                const RecentActivityList().animate().fadeIn(delay: 600.ms),
-                
-                const SizedBox(height: 48), // Bottom padding
-              ],
+                ],
+              ),
             ),
-          ),
+            
+            // MAIN CONTENT AREA (Responsive Split Panels)
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final bool isDesktop = constraints.maxWidth > 800;
+                    
+                    if (isDesktop) {
+                      // 🏛️ HYBRID DESKTOP VIEW
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // 🔝 TOP SECTION (2 Columns)
+                          Expanded(
+                            flex: 3,
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // LEFT: Active Tools & Weather
+                                Expanded(
+                                  flex: 2,
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(right: 16),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        _buildWeatherSection(weatherState, weather),
+                                        const SizedBox(height: 24),
+                                        Expanded(
+                                          child: _buildSmartToolsSection(context, tr, crossAxisCount: 3),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+
+                                _buildDivider(),
+
+                                // RIGHT: Plot & Recent Activity
+                                Expanded(
+                                  flex: 2,
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Padding(
+                                        padding: const EdgeInsets.only(left: 16, bottom: 12),
+                                        child: Text(
+                                          tr('select_plot'),
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                            color: ColorPalette.textPrimary,
+                                          ),
+                                        ),
+                                      ),
+                                      const Padding(
+                                        padding: EdgeInsets.only(left: 16, bottom: 20),
+                                        child: FieldSelector(),
+                                      ),
+                                      const Expanded(
+                                        child: Padding(
+                                          padding: EdgeInsets.only(left: 16),
+                                          child: RecentActivityList(),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 24),
+                          const Divider(height: 1),
+                          const SizedBox(height: 16),
+
+                          // 🆕 BOTTOM SECTION (Full Width Coming Soon)
+                          Expanded(
+                            flex: 2,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              child: _buildComingSoonSection(tr, crossAxisCount: 6, availableWidth: constraints.maxWidth - 48 - 32), // 48=outer padding, 32=inner padding
+                            ),
+                          ),
+                        ],
+                      );
+                    } else {
+                      // 📱 STACKED VIEW (Mobile)
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            flex: 4,
+                            child: SingleChildScrollView(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildWeatherSection(weatherState, weather),
+                                  const SizedBox(height: 24),
+                                  const FieldSelector(),
+                                  const SizedBox(height: 16),
+                                  _buildSmartToolsSection(context, tr, crossAxisCount: 2),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          const Divider(height: 1),
+                          const SizedBox(height: 16),
+
+                          // RECENT ACTIVITY (Middle Priority)
+                          Expanded(
+                            flex: 4,
+                            child: Padding(
+                               padding: const EdgeInsets.only(bottom: 16),
+                               child: RecentActivityList(),
+                            ),
+                          ),
+
+                          const SizedBox(height: 16),
+                          
+                          // COMING SOON (Bottom Priority - Fixed Wrap)
+                          Expanded(
+                            flex: 2,
+                            child: SingleChildScrollView( // Keep scroll ONLY for this section if it overflows vertically in small space
+                              child: _buildComingSoonSection(tr, crossAxisCount: 2, availableWidth: constraints.maxWidth),
+                            ),
+                          ),
+                        ],
+                      );
+                    }
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
         ),
       ),
+    );
+  }
+
+  /// Builds the Weather card
+  Widget _buildWeatherSection(var weatherState, var weather) {
+    return WeatherCard(
+      isLoading: weatherState.isLoading,
+      condition: weather?['condition'] ?? "Sunny",
+      temperature: (weather?['temperature'] as num?)?.toInt() ?? 28,
+      location: weather?['location'] ?? "Namakkal, Tamil Nadu",
+      date: DateTime.now(),
+    ).animate()
+        .fadeIn(duration: 600.ms)
+        .slideY(begin: 0.1, end: 0, curve: Curves.easeOut);
+  }
+
+  /// Builds the Active Smart Tools grid
+  Widget _buildSmartToolsSection(BuildContext context, dynamic tr, {required int crossAxisCount}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          tr('smart_tools'),
+          style: GoogleFonts.outfit(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: ColorPalette.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 12),
+        GridView.count(
+          crossAxisCount: crossAxisCount,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          childAspectRatio: 1.5,
+          children: [
+            ActionCard(
+              title: tr('crop_doctor'),
+              subtitle: tr('crop_doctor_desc'),
+              icon: Icons.local_hospital_rounded,
+              color: ColorPalette.rustRed,
+              onTap: () => context.push(AppRouter.cropDoctorPath),
+            ),
+            ActionCard(
+              title: tr('yield_est'),
+              subtitle: tr('yield_est_desc'),
+              icon: Icons.trending_up_rounded,
+              color: ColorPalette.goldenSunlight,
+              onTap: () => context.push(AppRouter.yieldPredictionPath),
+            ),
+          ],
+        ).animate().fadeIn(delay: 200.ms),
+      ],
+    );
+  }
+
+  /// Builds the Coming Soon tools grid
+  Widget _buildComingSoonSection(dynamic tr, {required int crossAxisCount, required double availableWidth}) {
+    // Calculate card width based on available width and column count
+    // Subtract spacing (10px gap * (count - 1))
+    final double spacing = 10;
+    final double cardWidth = (availableWidth - (spacing * (crossAxisCount - 1))) / crossAxisCount;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          tr('coming_soon'),
+          style: GoogleFonts.outfit(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: ColorPalette.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: [
+            _buildWrapItem(tr('soil_health_time_machine'), tr('soil_health_desc'), Icons.history_rounded, Colors.brown.shade400, cardWidth),
+            _buildWrapItem(tr('market_analysis'), tr('market_analysis_desc'), Icons.analytics_rounded, ColorPalette.emeraldGreen, cardWidth),
+            _buildWrapItem(tr('smart_irrigation'), tr('smart_irrigation_desc'), Icons.water_drop_rounded, Colors.blue.shade400, cardWidth),
+            _buildWrapItem(tr('sustainable_farming'), tr('sustainable_farming_desc'), Icons.eco_rounded, Colors.green.shade600, cardWidth),
+            _buildWrapItem(tr('community_alert'), tr('community_alert_desc'), Icons.notifications_active_rounded, Colors.orange.shade500, cardWidth),
+            _buildWrapItem(tr('government_schemes'), tr('government_schemes_desc'), Icons.account_balance_rounded, Colors.indigo.shade400, cardWidth),
+            _buildWrapItem(tr('onboarding_tutorials'), tr('onboarding_tutorials_desc'), Icons.school_rounded, Colors.teal.shade400, cardWidth),
+            _buildWrapItem(tr('voice_command'), tr('voice_command_desc'), Icons.mic_rounded, Colors.purple.shade400, cardWidth),
+            _buildWrapItem(tr('support_24_7'), tr('support_24_7_desc'), Icons.support_agent_rounded, Colors.blueAccent, cardWidth),
+          ].animate(interval: 50.ms).fade(duration: 300.ms),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildWrapItem(String title, String subtitle, IconData icon, Color color, double width) {
+    return SizedBox(
+      width: width,
+      child: ActionCard(
+        title: title,
+        subtitle: subtitle,
+        icon: icon,
+        color: color,
+        onTap: () {},
+        isComingSoon: true,
+      ),
+    );
+  }
+
+  /// Builds a vertical divider
+  Widget _buildDivider() {
+    return Container(
+      width: 1,
+      margin: const EdgeInsets.symmetric(vertical: 16),
+      color: Colors.grey.shade200,
     );
   }
 
@@ -284,3 +431,4 @@ class FarmerDashboardScreen extends ConsumerWidget {
     );
   }
 }
+
