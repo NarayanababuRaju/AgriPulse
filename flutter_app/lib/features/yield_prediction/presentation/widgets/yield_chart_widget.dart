@@ -157,7 +157,10 @@ class YieldChartWidget extends ConsumerWidget {
     if (index == 0) return languageNotifier.translate('today');
     if (index == 1) return languageNotifier.translate('tomorrow');
     
-    // For other days, use the short weekday name
-    return DateFormat('EEE').format(targetDate);
+    // For other days, use the short weekday name with appropriate locale
+    final String localeCode = (languageNotifier is LanguageNotifier) 
+        ? languageNotifier.state.code 
+        : 'en';
+    return DateFormat('EEE', localeCode).format(targetDate);
   }
 }
