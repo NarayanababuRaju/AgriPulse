@@ -72,4 +72,28 @@ class AuthRepositoryImpl implements AuthRepository {
     
     return _currentUser;
   }
+
+  @override
+  Future<Farmer> skipLogin() async {
+    // Simulate short delay
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    const user = Farmer(
+      id: "demo_farmer",
+      phoneNumber: "+911234567890",
+      name: "Raju",
+      language: "en",
+    );
+
+    // Persist demo user
+    await LocalVault().saveUser({
+      'id': user.id,
+      'phoneNumber': user.phoneNumber,
+      'name': user.name,
+      'language': user.language,
+    });
+
+    _currentUser = user;
+    return user;
+  }
 }

@@ -106,7 +106,7 @@ class _FarmerLoginScreenState extends ConsumerState<FarmerLoginScreen> {
           // 3. Content
           LoadingOverlay(
             isLoading: isLoading,
-            message: "Verifying securely...",
+            message: tr.translate('verifying_securely'),
             child: Center(
               child: SingleChildScrollView(
                 child: Center(
@@ -286,6 +286,22 @@ class _FarmerLoginScreenState extends ConsumerState<FarmerLoginScreen> {
                                       child: Text(tr.translate('login_change_number')),
                                     ),
                                   ],
+                                  const SizedBox(height: 16),
+                                  // SKIP LOGIN (DEMO) BUTTON
+                                  TextButton(
+                                    key: const Key('skip_login_button'),
+                                    onPressed: () {
+                                      ref.read(loginControllerProvider.notifier).skipLogin();
+                                    },
+                                    child: Text(
+                                      tr.translate('login_skip_demo'),
+                                      style: GoogleFonts.outfit(
+                                        color: ColorPalette.textSecondary,
+                                        decoration: TextDecoration.underline,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -298,6 +314,10 @@ class _FarmerLoginScreenState extends ConsumerState<FarmerLoginScreen> {
                             textAlign: TextAlign.center,
                             style: const TextStyle(color: Colors.white70, fontSize: 12),
                           ),
+                          
+                          const SizedBox(height: 16),
+                          
+
                         ],
                       ),
                     ),
