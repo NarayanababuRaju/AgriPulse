@@ -11,9 +11,12 @@ import 'core/models/weather_cache.dart';
 import 'core/services/local_vault.dart';
 import 'features/crop_diagnosis/models/thread_item.dart';
 
+import 'package:intl/date_symbol_data_local.dart';
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  debugPrint("🚀 AgriPulse: Widgets initialized.");
+  await initializeDateFormatting(); // Fix for LocaleDataException
+  debugPrint("🚀 AgriPulse: Widgets & Locale initialized.");
   
   // Initialize Hive for local caching
   try {
