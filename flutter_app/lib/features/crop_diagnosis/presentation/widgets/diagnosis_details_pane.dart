@@ -31,9 +31,33 @@ class DiagnosisDetailsPane extends ConsumerWidget {
     final bool isHealthy = record.diseaseName.toLowerCase().contains('healthy') || 
                            record.diseaseName.toLowerCase().contains('no disease');
     final Color statusColor = isHealthy ? ColorPalette.emeraldGreen : ColorPalette.rustRed;
+    
+    final diagnosisState = ref.watch(diagnosisProvider);
+    final bool isCorrectRecord = diagnosisState.activeRecordId == record.id;
+    
+    // Prefer state if available for this specific record (translation/refinement support)
+    final String diseaseName = isCorrectRecord && diagnosisState.diagnosisResult != null 
+        ? (diagnosisState.diagnosisResult!['disease_name'] ?? record.diseaseName)
+        : record.diseaseName;
+        
+    final String summary = isCorrectRecord && diagnosisState.diagnosisResult != null 
+        ? (diagnosisState.diagnosisResult!['treatment_recommendation'] ?? record.treatmentSummary)
+        : record.treatmentSummary;
+
+    final String? adjustment = isCorrectRecord && diagnosisState.diagnosisResult != null 
+        ? (diagnosisState.diagnosisResult!['treatment_adjustment'] ?? record.treatmentAdjustment)
+        : record.treatmentAdjustment;
+
+    final String? reasoning = isCorrectRecord && diagnosisState.diagnosisResult != null 
+        ? (diagnosisState.diagnosisResult!['refinement_reasoning'] ?? record.refinementReasoning)
+        : record.refinementReasoning;
+
+    if (diagnosisState.isAnalyzing && isCorrectRecord) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
     if (isCompact) {
-      return _buildControlCenterLayout(tr, statusColor, isHealthy);
+      return _buildControlCenterLayout(tr, statusColor, isHealthy, diseaseName, summary, adjustment, reasoning);
     }
 
     return SingleChildScrollView(
@@ -68,7 +92,7 @@ class DiagnosisDetailsPane extends ConsumerWidget {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      "${tr.translate('crop_doctor')}:\n${record.diseaseName}",
+                      "${tr.translate('crop_doctor')}:\n$diseaseName",
                       style: GoogleFonts.outfit(
                         fontSize: 32,
                         fontWeight: FontWeight.bold,
@@ -143,7 +167,7 @@ class DiagnosisDetailsPane extends ConsumerWidget {
           const SizedBox(height: 32),
 
           // IMAGE PANEL (Phase 20+)
-          _buildImageHeader(record.imagePath),
+          _buildImageHeader(record.imagePath, tr: tr),
 
           const SizedBox(height: 32),
 
@@ -154,7 +178,7 @@ class DiagnosisDetailsPane extends ConsumerWidget {
               // Diagnostic Findings
               Expanded(
                 flex: 3,
-                child: _buildFindingsCard(record.farmerInput ?? tr.translate('no_feedback_provided'), tr, thread: record.thread),
+                child: _buildFindingsCard(record.farmerInput ?? tr.translate('no_feedback_provided'), tr, thread: record.thread, reasoning: reasoning),
               ),
               const SizedBox(width: 24),
               // Unified Metrics (Restored & Consolidated)
@@ -179,15 +203,15 @@ class DiagnosisDetailsPane extends ConsumerWidget {
                     Consumer(
                       builder: (context, ref, _) {
                         final activeView = ref.watch(activeDiagnosisViewProvider);
-                        final isRefinedView = activeView == 1 && record.treatmentAdjustment != null;
+                        final isRefinedView = activeView == 1 && adjustment != null;
                         
                         return _buildActionCard(
                           isRefinedView ? tr.translate('treatment_adjustment_label') : tr.translate('ai_recommendation'), 
                           isRefinedView 
-                            ? (record.treatmentAdjustment ?? record.treatmentSummary)
-                            : (record.treatmentAdjustment != null 
-                                ? _deduplicateTreatment(record.treatmentSummary, record.treatmentAdjustment)
-                                : record.treatmentSummary), 
+                            ? (adjustment ?? summary)
+                            : (adjustment != null 
+                                ? _deduplicateTreatment(summary, adjustment)
+                                : summary), 
                           isRefinedView ? Icons.auto_awesome : Icons.medical_services_outlined,
                           isRefinedView ? Colors.orange : ColorPalette.emeraldGreen,
                           isSecondary: isRefinedView,
@@ -214,7 +238,7 @@ class DiagnosisDetailsPane extends ConsumerWidget {
     );
   }
 
-  Widget _buildControlCenterLayout(dynamic tr, Color statusColor, bool isHealthy) {
+  Widget _buildControlCenterLayout(dynamic tr, Color statusColor, bool isHealthy, String diseaseName, String summary, String? adjustment, String? reasoning) {
     return Padding(
       padding: const EdgeInsets.all(24.0),
       child: Column(
@@ -228,7 +252,7 @@ class DiagnosisDetailsPane extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      record.diseaseName,
+                      diseaseName,
                       style: GoogleFonts.outfit(fontSize: 28, fontWeight: FontWeight.bold, color: ColorPalette.textPrimary),
                     ),
                     Text(
@@ -253,14 +277,14 @@ class DiagnosisDetailsPane extends ConsumerWidget {
                   flex: 4,
                   child: Column(
                     children: [
-                      _buildImageHeader(record.imagePath, isCompact: true, isBoxed: true),
+                      _buildImageHeader(record.imagePath, isCompact: true, isBoxed: true, tr: tr),
                       const SizedBox(height: 16),
                       // Findings Panel (Now correctly Expanded within the Column)
                       Expanded(
                         child: _buildScrollablePanel(
                           title: tr.translate('findings'),
                           icon: Icons.verified_user_outlined,
-                          child: _buildFindingsCardContent(record.farmerInput ?? tr.translate('no_feedback_provided'), tr, thread: record.thread),
+                          child: _buildFindingsCardContent(record.farmerInput ?? tr.translate('no_feedback_provided'), tr, thread: record.thread, reasoning: reasoning),
                         ),
                       ),
                     ],
@@ -285,19 +309,19 @@ class DiagnosisDetailsPane extends ConsumerWidget {
                               Consumer(
                                 builder: (context, ref, _) {
                                   final activeView = ref.watch(activeDiagnosisViewProvider);
-                                  final isRefinedView = activeView == 1 && record.treatmentAdjustment != null;
-
+                                  final isRefinedView = activeView == 1 && adjustment != null;
+                                  
                                   return _buildActionCardContent(
                                     isRefinedView ? tr.translate('treatment_adjustment_label') : tr.translate('ai_recommendation'), 
                                     isRefinedView 
-                                      ? (record.treatmentAdjustment ?? record.treatmentSummary)
-                                      : (record.treatmentAdjustment != null 
-                                          ? _deduplicateTreatment(record.treatmentSummary, record.treatmentAdjustment)
-                                          : record.treatmentSummary), 
+                                      ? (adjustment ?? summary)
+                                      : (adjustment != null 
+                                          ? _deduplicateTreatment(summary, adjustment)
+                                          : summary), 
                                     isRefinedView ? Icons.auto_awesome : Icons.psychology_outlined,
                                     isRefinedView ? Colors.orange : ColorPalette.emeraldGreen,
                                   );
-                                }
+                                },
                               ),
                             ],
                           ),
@@ -434,201 +458,161 @@ class DiagnosisDetailsPane extends ConsumerWidget {
     );
   }
 
-  Widget _buildFindingsCard(String findings, dynamic tr, {List<dynamic>? thread}) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.grey.shade100),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.verified_user_outlined, color: ColorPalette.emeraldGreen, size: 20),
-              const SizedBox(width: 12),
-              Text(
-                tr.translate('findings'),
-                style: GoogleFonts.outfit(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: ColorPalette.textPrimary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          _buildFindingsCardContent(findings, tr, thread: thread),
-        ],
-      ),
+  Widget _buildFindingsCard(String farmerInput, dynamic tr, {List<dynamic>? thread, String? reasoning}) {
+    return _buildScrollablePanel(
+      title: tr.translate('findings'),
+      icon: Icons.verified_user_outlined,
+      child: _buildFindingsCardContent(farmerInput, tr, thread: thread, reasoning: reasoning),
     );
   }
 
-  Widget _buildFindingsCardContent(String findings, dynamic tr, {List<dynamic>? thread}) {
-    String? initialInput;
-    String? initialResponse;
-    String? refinementInput;
-    String? refinementResponse;
-
-    // 1. Thread-First Extraction (Most robust for ordering)
-    if (thread != null && thread.isNotEmpty) {
-      final userMessages = thread.where((item) {
-        final role = (item is ThreadItem ? item.role : (item as dynamic)['role'])?.toString().toLowerCase() ?? "";
-        return role == 'user' || role == 'farmer';
-      }).toList();
-      
-      final aiMessages = thread.where((item) {
-        final role = (item is ThreadItem ? item.role : (item as dynamic)['role'])?.toString().toLowerCase() ?? "";
-        return role == 'ai' || role == 'assistant' || role == 'system';
-      }).toList();
-
-      String getContent(dynamic item) {
-        if (item is ThreadItem) return item.content;
-        try {
-          return (item as Map)['content']?.toString() ?? "";
-        } catch (_) {
-          return "";
-        }
-      }
-
-      // Step 1: Historical origin (User's first word)
-      if (userMessages.isNotEmpty) initialInput = getContent(userMessages.first);
-      // Step 2: Historical origin (AI's first word)
-      if (aiMessages.isNotEmpty) initialResponse = getContent(aiMessages.first);
-
-      // Step 3 & 4: The Refinement Journey (ONLY if thread has subsequent steps)
-      if (userMessages.length > 1) {
-        final String latestUser = getContent(userMessages.last);
-        if (initialInput != null && latestUser.trim() != initialInput.trim()) {
-           refinementInput = latestUser;
-        }
-      }
-      if (aiMessages.length > 1) {
-        final String latestAi = getContent(aiMessages.last);
-        if (initialResponse != null && latestAi.trim() != initialResponse.trim()) {
-           refinementResponse = latestAi;
-        }
-      }
-    }
-
-    // 2. Explicit Marker Overrides (ULTIMATE Source of Truth for Steps 1 & 2)
-    // If these fields exist in the record, they were saved correctly during analysis/refinement.
-    if (record.initialUserInput != null && record.initialUserInput!.isNotEmpty) {
-      initialInput = record.initialUserInput;
-    }
-    if (record.initialAiResponse != null && record.initialAiResponse!.isNotEmpty) {
-      initialResponse = record.initialAiResponse;
-    }
-
-    // 3. Last-Resort Fallbacks (For records with NO thread or markers)
-    initialInput ??= record.farmerInput ?? findings; 
-    initialResponse ??= (record.treatmentSummary.isNotEmpty ? record.treatmentSummary : record.diseaseName);
-
-    // 4. Legacy "Self-Healing": Detect if Step 1 accidentally holds AI recommendation text
-    // (This happened in early versions where recommendation was saved to farmerInput).
-    final String s1 = initialInput.toLowerCase();
-    final bool step1IsClearlyAI = initialInput.length > 200 || 
-        initialInput.contains("**") || 
-        s1.contains("treatment") || 
-        s1.contains("schedule") ||
-        s1.contains("fungicide");
+  Widget _buildFindingsCardContent(String farmerInput, dynamic tr, {List<dynamic>? thread, String? reasoning}) {
+    // ═══════════════════════════════════════════════════════════════════════════
+    // THREAD EXTRACTION: Build a complete list of all conversation items
+    // ═══════════════════════════════════════════════════════════════════════════
+    // This replaces the old "first + last only" logic that was hiding intermediate feedbacks.
+    // Now we iterate through ALL thread items to display the complete conversation history.
     
-    final bool step2IsWeak = initialResponse.length < 50 || 
-        initialResponse == record.diseaseName;
-
-    final bool isDuplicated = initialInput.trim() == initialResponse.trim();
-
-    if (isDuplicated || (step1IsClearlyAI && step2IsWeak)) {
-      // If they are exactly the same, or if Step 1 looks like AI while Step 2 is weak:
-      // We assume Step 1 is actually the response and Step 2 is either a copy or a weak placeholder.
-      if (initialInput.length >= initialResponse.length) {
-        initialResponse = initialInput;
-      }
-      initialInput = ""; // Effectively marks it as "no feedback"
-    }
-
-    // 5. Refinement Field Recovery (If fields have adjustments but thread was incomplete)
-    if (refinementResponse == null && record.treatmentAdjustment != null) {
-       refinementResponse = record.refinementReasoning ?? record.treatmentAdjustment;
-    }
-    if (refinementInput == null && record.refinementReasoning != null) {
-       if (record.farmerInput != null && record.farmerInput != initialInput) {
-         refinementInput = record.farmerInput;
-       }
-    }
-
-    // 6. Final Deduplication & Cleanup
-    final String finalInitialInput = initialInput.trim().isEmpty
-        ? tr.translate('no_feedback_provided') 
-        : initialInput;
+    List<Map<String, dynamic>> threadItems = [];
+    
+    if (thread != null && thread.isNotEmpty) {
+      // PRIMARY PATH: Extract from saved conversation thread
+      // The thread contains the complete conversation history with all user feedbacks and AI responses
+      for (int i = 0; i < thread.length; i++) {
+        final item = thread[i];
         
-    if (initialResponse.isEmpty) initialResponse = null;
-    if (refinementResponse != null && (refinementResponse.isEmpty || refinementResponse == initialResponse)) {
-      refinementResponse = null;
-    }
-    if (refinementInput != null && (refinementInput.isEmpty || refinementInput == initialInput)) {
-      refinementInput = null;
+        // Handle both ThreadItem objects and raw Map structures for backward compatibility
+        final role = (item is ThreadItem ? item.role : (item as dynamic)['role'])?.toString().toLowerCase() ?? "";
+        final content = item is ThreadItem ? item.content : (item as dynamic)['content']?.toString() ?? "";
+        
+        // Filter valid conversation items (user/farmer inputs and AI/assistant responses)
+        if (content.isNotEmpty && (role == 'user' || role == 'farmer' || role == 'ai' || role == 'assistant')) {
+          threadItems.add({
+            'role': role,
+            'content': content,
+            'index': i,
+          });
+        }
+      }
+    } else {
+      // FALLBACK PATH: Reconstruct thread from legacy record fields
+      // For older records that don't have the thread field, we build it from individual fields
+      
+      // Step 1: Initial user input
+      if (record.farmerInput != null && record.farmerInput!.isNotEmpty) {
+        threadItems.add({'role': 'user', 'content': record.farmerInput!, 'index': 0});
+      }
+      
+      // Step 2: Initial AI diagnosis
+      if (record.treatmentSummary.isNotEmpty) {
+        threadItems.add({'role': 'ai', 'content': record.treatmentSummary, 'index': 1});
+      }
+      
+      // Step 3 & 4: Refinement (if available)
+      if (record.refinementReasoning != null && record.refinementReasoning!.isNotEmpty) {
+        // Note: We don't have the actual refinement input saved in legacy records,
+        // so we use a placeholder. The reasoning/adjustment is the important part.
+        threadItems.add({'role': 'user', 'content': 'Additional feedback provided', 'index': 2});
+        threadItems.add({'role': 'ai', 'content': reasoning ?? record.refinementReasoning!, 'index': 3});
+      }
     }
 
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // DYNAMIC DISPLAY: Render all thread items with appropriate styling
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Each item gets numbered labels (e.g., "Refinement Feedback #2", "#3", etc.)
+    // AI responses are clickable to switch between treatment views
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 1. Initial Input
-        _buildFindingStep(
-          label: tr.translate('initial_request'),
-          text: finalInitialInput,
-          icon: Icons.person_outline,
-          color: Colors.grey.shade600,
-        ),
-        
-        // 2. Initial Diagnosis (Clickable)
-        if (initialResponse != null) ...[
-          const SizedBox(height: 16),
-          Consumer(
-            builder: (context, ref, _) {
-              final activeView = ref.watch(activeDiagnosisViewProvider);
-              return _buildClickableFindingCard(
-                label: tr.translate('initial_diagnosis'),
-                text: tr.translate('view_standard_treatment'),
-                icon: Icons.auto_awesome,
-                color: ColorPalette.emeraldGreen,
-                isActive: activeView == 0,
-                onTap: () => ref.read(activeDiagnosisViewProvider.notifier).state = 0,
+        // Iterate through ALL thread items (no more skipping intermediate feedbacks!)
+        ...threadItems.asMap().entries.map((entry) {
+          final index = entry.key;
+          final item = entry.value;
+          final role = item['role'] as String;
+          final content = item['content'] as String;
+          final isUser = role == 'user' || role == 'farmer';
+          
+          // Determine label, icon, and color based on role and position
+          String label;
+          IconData icon;
+          Color color;
+          Widget? itemWidget;
+          
+          if (isUser) {
+            // USER/FARMER FEEDBACK
+            if (index == 0) {
+              // First user message: "Initial Request"
+              label = tr.translate('initial_request');
+              icon = Icons.person_outline;
+              color = Colors.grey.shade600;
+            } else {
+              // Subsequent user messages: "Refinement Feedback #2", "#3", etc.
+              final feedbackNumber = (index ~/ 2) + 1;
+              label = '${tr.translate('refinement_feedback')} #$feedbackNumber';
+              icon = Icons.edit_note;
+              color = Colors.blue.shade600;
+            }
+            
+            // Render as a simple text box
+            itemWidget = _buildFindingStep(
+              label: label,
+              text: content,
+              icon: icon,
+              color: color,
+            );
+          } else {
+            // AI RESPONSE (clickable to switch treatment views)
+            if (index == 1) {
+              // First AI response: "Initial Diagnosis"
+              label = tr.translate('initial_diagnosis');
+              icon = Icons.auto_awesome;
+              color = ColorPalette.emeraldGreen;
+              
+              itemWidget = Consumer(
+                builder: (context, ref, _) {
+                  final activeView = ref.watch(activeDiagnosisViewProvider);
+                  return _buildClickableFindingCard(
+                    label: label,
+                    text: tr.translate('view_standard_treatment'),
+                    icon: icon,
+                    color: color,
+                    isActive: activeView == 0,
+                    onTap: () => ref.read(activeDiagnosisViewProvider.notifier).state = 0,
+                  );
+                }
+              );
+            } else {
+              // Subsequent AI responses: "Refined Diagnosis #2", "#3", etc.
+              final responseNumber = (index ~/ 2);
+              label = '${tr.translate('refined_diagnosis')} #$responseNumber';
+              icon = Icons.psychology_outlined;
+              color = Colors.orange.shade700;
+              
+              itemWidget = Consumer(
+                builder: (context, ref, _) {
+                  final activeView = ref.watch(activeDiagnosisViewProvider);
+                  return _buildClickableFindingCard(
+                    label: label,
+                    text: tr.translate('view_adjusted_plan'),
+                    icon: icon,
+                    color: color,
+                    isActive: activeView == responseNumber,
+                    onTap: () => ref.read(activeDiagnosisViewProvider.notifier).state = responseNumber,
+                  );
+                }
               );
             }
-          ),
-        ],
-
-        // 3. Refinement Input
-        if (refinementInput != null) ...[
-          const SizedBox(height: 24),
-          _buildFindingStep(
-            label: tr.translate('refinement_feedback'),
-            text: refinementInput,
-            icon: Icons.edit_note,
-            color: Colors.blue.shade600,
-          ),
-        ],
-
-        // 4. Refined Diagnosis (Clickable)
-        if (refinementResponse != null) ...[
-          const SizedBox(height: 16),
-          Consumer(
-            builder: (context, ref, _) {
-              final activeView = ref.watch(activeDiagnosisViewProvider);
-              return _buildClickableFindingCard(
-                label: tr.translate('refined_diagnosis'),
-                text: tr.translate('view_adjusted_plan'),
-                icon: Icons.psychology_outlined,
-                color: Colors.orange.shade700,
-                isActive: activeView == 1,
-                onTap: () => ref.read(activeDiagnosisViewProvider.notifier).state = 1,
-              );
-            }
-          ),
-        ],
+          }
+          
+          // Add appropriate spacing between items
+          return Padding(
+            padding: EdgeInsets.only(top: index == 0 ? 0 : (isUser ? 24 : 16)),
+            child: itemWidget,
+          );
+        }).toList(),
       ],
     );
   }
@@ -938,7 +922,7 @@ class DiagnosisDetailsPane extends ConsumerWidget {
     );
   }
 
-  Widget _buildImageHeader(String path, {bool isCompact = false, bool isBoxed = false}) {
+  Widget _buildImageHeader(String path, {bool isCompact = false, bool isBoxed = false, required dynamic tr}) {
     return Container(
       height: isBoxed ? 200 : (isCompact ? 180 : 300),
       decoration: BoxDecoration(
@@ -996,7 +980,7 @@ class DiagnosisDetailsPane extends ConsumerWidget {
                     const Icon(Icons.photo_library_outlined, color: Colors.white, size: 12),
                     const SizedBox(width: 6),
                     Text(
-                      isBoxed ? "EVIDENCE" : "ANALYZED EVIDENCE",
+                      isBoxed ? tr.translate('evidence').toUpperCase() : tr.translate('analyzed_evidence').toUpperCase(),
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 9,

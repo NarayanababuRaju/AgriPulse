@@ -332,45 +332,69 @@ class DiagnosisController extends StateNotifier<DiagnosisState> {
   }
 
   /// Translate the current diagnosis result
-  Future<void> translateDiagnosis(String languageName) async {
-    if (state.diagnosisResult == null) return;
-    state = state.copyWith(isAnalyzing: true);
+  Future<void> translateDiagnosis(String languageName, {String? recordId}) async {
+    if (state.diagnosisResult == null && recordId == null) return;
+    state = state.copyWith(isAnalyzing: true, activeRecordId: recordId ?? state.activeRecordId);
 
     try {
       final currentResult = state.diagnosisResult!;
       final disease = currentResult['disease_name'] ?? '';
       final treatment = currentResult['treatment_recommendation'] ?? '';
       final prevention = (currentResult['prevention'] as List?)?.join(' . ') ?? '';
+      final reasoning = currentResult['refinement_reasoning'] ?? '';
+      final adjustment = currentResult['treatment_adjustment'] ?? '';
 
-      // Format: "DISEASE_START...DISEASE_END..."
-      final fullText = '''
-DISEASE_START
-$disease
-DISEASE_END
-TREATMENT_START
-$treatment
-TREATMENT_END
-PREVENTION_START
-$prevention
-PREVENTION_END
-''';
+      final fullText = """
+      INSTRUCTION: Translate the following agricultural diagnosis into $languageName. 
+      IMPORTANT: DO NOT translate or modify any text inside double brackets like [[TAG_NAME]]. Keep them exactly as they are.
+
+      [[CROP_DISEASE]]
+      $disease
+      
+      [[TREATMENT_PLAN]]
+      $treatment
+      
+      [[PREVENTION_STEPS]]
+      $prevention
+      
+      [[AI_REASONING]]
+      $reasoning
+      
+      [[TREATMENT_ADJUSTMENT]]
+      $adjustment
+      """;
 
       final translatedBlock = await _apiService.translateText(fullText, languageName);
+      final String translatedStr = translatedBlock.toString();
 
-      // Parse
-      final diseaseMatch = RegExp(r'DISEASE_START\n(.*?)\nDISEASE_END', dotAll: true).firstMatch(translatedBlock);
-      final treatmentMatch = RegExp(r'TREATMENT_START\n(.*?)\nTREATMENT_END', dotAll: true).firstMatch(translatedBlock);
-      final preventionMatch = RegExp(r'PREVENTION_START\n(.*?)\nPREVENTION_END', dotAll: true).firstMatch(translatedBlock);
-      
-      final newDisease = diseaseMatch?.group(1)?.trim() ?? disease;
-      final newTreatment = treatmentMatch?.group(1)?.trim() ?? treatment;
-      final preventionText = preventionMatch?.group(1)?.trim();
-      final newPrevention = preventionText != null ? preventionText.split(' . ') : (currentResult['prevention'] as List?);
+      String parseSection(String tag) {
+        final lines = translatedStr.split("\n");
+        int startIndex = lines.indexWhere((l) => l.contains(tag));
+        if (startIndex == -1) return "";
+        
+        final result = <String>[];
+        for (int i = startIndex + 1; i < lines.length; i++) {
+          final line = lines[i].trim();
+          if (line.isEmpty) continue;
+          if (line.startsWith("[[") && line.endsWith("]]")) break; 
+          result.add(line);
+        }
+        return result.join("\n");
+      }
+
+      final newDisease = parseSection("[[CROP_DISEASE]]").split("\n").first.trim();
+      final newTreatment = parseSection("[[TREATMENT_PLAN]]");
+      final newPreventionRaw = parseSection("[[PREVENTION_STEPS]]");
+      final newPrevention = newPreventionRaw.isNotEmpty ? newPreventionRaw.split(' . ') : (currentResult['prevention'] as List?);
+      final newReasoning = parseSection("[[AI_REASONING]]");
+      final newAdjustment = parseSection("[[TREATMENT_ADJUSTMENT]]");
 
       final newResult = Map<String, dynamic>.from(currentResult);
-      newResult['disease_name'] = newDisease;
-      newResult['treatment_recommendation'] = newTreatment;
+      newResult['disease_name'] = newDisease.isNotEmpty ? newDisease : disease;
+      newResult['treatment_recommendation'] = newTreatment.isNotEmpty ? newTreatment : treatment;
       newResult['prevention'] = newPrevention;
+      newResult['refinement_reasoning'] = newReasoning.isNotEmpty ? newReasoning : reasoning;
+      newResult['treatment_adjustment'] = newAdjustment.isNotEmpty ? newAdjustment : adjustment;
 
       state = state.copyWith(isAnalyzing: false, diagnosisResult: newResult);
     } catch (e) {

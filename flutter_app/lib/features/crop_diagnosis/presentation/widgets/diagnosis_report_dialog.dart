@@ -35,51 +35,61 @@ class DiagnosisReportDialog extends ConsumerWidget {
     final reasoning = data['refinement_reasoning']?.toString();
     final date = DateTime.now().toString().split(' ')[0]; // Mock Date
 
-    // Extract 4-part findings from thread if available
-    String? initialInput = farmerDescription;
-    String? initialResponse;
-    String? refinementInput = additionalDescription;
-    String? refinementResponse = reasoning;
-
-    if (thread != null && thread!.isNotEmpty) {
-      // Robust extraction for both ThreadItem objects and Map structures
-      final userMessages = thread!.where((item) {
-        final role = item is ThreadItem ? item.role : (item as dynamic)['role'];
-        return role == 'user';
-      }).toList();
-      
-      final aiMessages = thread!.where((item) {
-        final role = item is ThreadItem ? item.role : (item as dynamic)['role'];
-        return role == 'ai';
-      }).toList();
-
-      String getContent(dynamic item) {
-        return item is ThreadItem ? item.content : (item as dynamic)['content']?.toString() ?? "";
-      }
-
-      if (userMessages.isNotEmpty) initialInput = getContent(userMessages.first);
-      if (aiMessages.isNotEmpty) initialResponse = getContent(aiMessages.first);
-      if (userMessages.length > 1) refinementInput = getContent(userMessages.last);
-      if (aiMessages.length > 1) refinementResponse = getContent(aiMessages.last);
-    }
-
-    // Fallback to widget direct parameters/data if thread is missing
-    initialInput ??= farmerDescription;
-    initialResponse ??= data['treatment_recommendation']?.toString();
-    refinementInput ??= additionalDescription;
-    refinementResponse ??= data['refinement_reasoning']?.toString();
+    // ═══════════════════════════════════════════════════════════════════════════
+    // THREAD EXTRACTION: Build a complete list of all conversation items
+    // ═══════════════════════════════════════════════════════════════════════════
+    // This replaces the old "first + last only" logic that was hiding intermediate feedbacks.
+    // Now we iterate through ALL thread items to display the complete conversation history.
     
-    // Sanity checks for empty strings
-    if (initialInput != null && initialInput.isEmpty) initialInput = null;
-    if (initialResponse != null && initialResponse.isEmpty) initialResponse = null;
-    if (refinementResponse != null && refinementResponse.isEmpty) refinementResponse = null;
-    if (refinementInput != null && refinementInput.isEmpty) refinementInput = null;
+    List<Map<String, dynamic>> threadItems = [];
+    
+    if (thread != null && thread!.isNotEmpty) {
+      // PRIMARY PATH: Extract from saved conversation thread
+      // The thread contains the complete conversation history with all user feedbacks and AI responses
+      for (int i = 0; i < thread!.length; i++) {
+        final item = thread![i];
+        
+        // Handle both ThreadItem objects and raw Map structures for backward compatibility
+        final role = item is ThreadItem ? item.role : (item as dynamic)['role'];
+        final content = item is ThreadItem ? item.content : (item as dynamic)['content']?.toString() ?? "";
+        
+        // Only include non-empty content
+        if (content.isNotEmpty) {
+          threadItems.add({
+            'role': role,
+            'content': content,
+            'index': i,
+          });
+        }
+      }
+    } else {
+      // FALLBACK PATH: Reconstruct thread from legacy dialog parameters
+      // For older records or direct dialog invocations without a thread
+      
+      // Step 1: Initial user input
+      if (farmerDescription != null && farmerDescription!.isNotEmpty) {
+        threadItems.add({'role': 'user', 'content': farmerDescription, 'index': 0});
+      }
+      
+      // Step 2: Initial AI diagnosis
+      if (initialTreatment.isNotEmpty) {
+        threadItems.add({'role': 'ai', 'content': initialTreatment, 'index': 1});
+      }
+      
+      // Step 3 & 4: Refinement (if available)
+      if (additionalDescription != null && additionalDescription!.isNotEmpty) {
+        threadItems.add({'role': 'user', 'content': additionalDescription, 'index': 2});
+      }
+      if (reasoning != null && reasoning.isNotEmpty) {
+        threadItems.add({'role': 'ai', 'content': reasoning, 'index': 3});
+      }
+    }
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       backgroundColor: Colors.white,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 500, maxHeight: 700),
+        constraints: const BoxConstraints(maxWidth: 850, maxHeight: 850),
         child: Padding(
           padding: const EdgeInsets.all(24.0),
           child: Column(
@@ -91,9 +101,9 @@ class DiagnosisReportDialog extends ConsumerWidget {
                 children: [
                   const Icon(Icons.description_outlined, color: ColorPalette.emeraldGreen, size: 28),
                   const SizedBox(width: 12),
-                  const Text(
-                    "Diagnosis Report",
-                    style: TextStyle(
+                  Text(
+                    tr('diagnosis_report'),
+                    style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
                       color: ColorPalette.textPrimary,
@@ -114,20 +124,20 @@ class DiagnosisReportDialog extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildRow("Date:", date),
+                      _buildRow(tr('date_label'), date),
                       const SizedBox(height: 12),
-                      _buildRow("Disease:", disease, isBold: true, color: ColorPalette.rustRed),
+                      _buildRow(tr('disease_label'), disease, isBold: true, color: ColorPalette.rustRed),
                       const SizedBox(height: 12),
-                      _buildRow("Confidence:", "${(confidence * 100).toInt()}%"),
+                      _buildRow(tr('confidence_label'), "${(confidence * 100).toInt()}%"),
                       
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 20),
                         child: Divider(),
                       ),
 
-                      const Text(
-                        "DIAGNOSTIC FINDINGS",
-                        style: TextStyle(
+                      Text(
+                        tr('diagnostic_findings_title'),
+                        style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
                           color: Colors.grey,
@@ -136,51 +146,68 @@ class DiagnosisReportDialog extends ConsumerWidget {
                       ),
                       const SizedBox(height: 16),
 
-                      // 1. Initial Input
-                      _buildStepBox(
-                        label: tr('initial_request'),
-                        text: (initialInput == null || initialInput.trim().isEmpty) 
-                            ? tr('no_feedback_provided') 
-                            : initialInput,
-                        icon: Icons.person_outline,
-                        color: Colors.grey.shade600,
-                      ),
+                      // ═══════════════════════════════════════════════════════════════════════
+                      // DYNAMIC DISPLAY: Render all thread items with numbered labels
+                      // ═══════════════════════════════════════════════════════════════════════
+                      // Each item gets numbered labels (e.g., "Refinement Feedback #2", "#3", etc.)
                       
-                      // 2. Initial Response
-                      if (initialResponse != null) ...[
-                        const SizedBox(height: 12),
-                        _buildStepBox(
-                          label: tr('ai_findings'), // Standardized localized key
-                          text: initialResponse,
-                          icon: Icons.auto_awesome,
-                          color: ColorPalette.emeraldGreen,
-                        ),
-                      ],
-
-                      // 3. Refinement Input
-                      if (refinementInput != null) ...[
-                        const SizedBox(height: 12),
-                        _buildStepBox(
-                          label: tr('refinement_feedback'),
-                          text: refinementInput,
-                          icon: Icons.edit_note,
-                          color: Colors.blue.shade600,
-                        ),
-                      ],
-
-                      // 4. Refinement Response
-                      if (refinementResponse != null) ...[
-                        const SizedBox(height: 12),
-                        _buildStepBox(
-                          label: tr('refinement_reasoning'),
-                          text: refinementResponse,
-                          icon: Icons.psychology_outlined,
-                          color: Colors.orange.shade700,
-                        ),
-                      ],
+                      // Iterate through ALL thread items (no more skipping intermediate feedbacks!)
+                      ...threadItems.asMap().entries.map((entry) {
+                        final index = entry.key;
+                        final item = entry.value;
+                        final role = item['role'] as String;
+                        final content = item['content'] as String;
+                        final isUser = role == 'user';
+                        
+                        // Determine label, icon, and color based on role and position
+                        String label;
+                        IconData icon;
+                        Color color;
+                        
+                        if (isUser) {
+                          // USER FEEDBACK
+                          if (index == 0) {
+                            // First user message: "Initial Request"
+                            label = tr('initial_request');
+                            icon = Icons.person_outline;
+                            color = Colors.grey.shade600;
+                          } else {
+                            // Subsequent user messages: "Refinement Feedback #2", "#3", etc.
+                            final feedbackNumber = (index ~/ 2) + 1;
+                            label = '${tr('refinement_feedback')} #$feedbackNumber';
+                            icon = Icons.edit_note;
+                            color = Colors.blue.shade600;
+                          }
+                        } else {
+                          // AI RESPONSE
+                          if (index == 1) {
+                            // First AI response: "AI Findings"
+                            label = tr('ai_findings');
+                            icon = Icons.auto_awesome;
+                            color = ColorPalette.emeraldGreen;
+                          } else {
+                            // Subsequent AI responses: "Refinement Reasoning #2", "#3", etc.
+                            final responseNumber = (index ~/ 2);
+                            label = '${tr('refinement_reasoning')} #$responseNumber';
+                            icon = Icons.psychology_outlined;
+                            color = Colors.orange.shade700;
+                          }
+                        }
+                        
+                        // Render each item with appropriate spacing
+                        return Padding(
+                          padding: EdgeInsets.only(top: index == 0 ? 0 : 12),
+                          child: _buildStepBox(
+                            label: label,
+                            text: content,
+                            icon: icon,
+                            color: color,
+                          ),
+                        );
+                      }).toList(),
 
                       const SizedBox(height: 32),
-                      const Text("Standard Treatment Plan:", style: TextStyle(fontWeight: FontWeight.bold)),
+                      Text("${tr('standard_treatment_plan')}:", style: const TextStyle(fontWeight: FontWeight.bold)),
                       const SizedBox(height: 12),
                       MarkdownBody(
                         data: _deduplicateTreatment(initialTreatment, adjustment),
@@ -205,13 +232,13 @@ class DiagnosisReportDialog extends ConsumerWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Row(
+                              Row(
                                 children: [
-                                  Icon(Icons.auto_awesome, color: Colors.orange, size: 20),
-                                  SizedBox(width: 8),
+                                  const Icon(Icons.auto_awesome, color: Colors.orange, size: 20),
+                                  const SizedBox(width: 8),
                                   Text(
-                                    "Treatment Adjustments",
-                                    style: TextStyle(
+                                    tr('treatment_adjustments'),
+                                    style: const TextStyle(
                                       fontWeight: FontWeight.bold,
                                       color: Colors.orange,
                                       fontSize: 15,
@@ -265,11 +292,11 @@ class DiagnosisReportDialog extends ConsumerWidget {
                       onPressed: () {
                         // Mock Share Action
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text("Sharing Report..."))
+                          SnackBar(content: Text(tr('sharing_report')))
                         );
                       },
                       icon: const Icon(Icons.share_rounded),
-                      label: const Text("Share"),
+                      label: Text(tr('share_button')),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -282,11 +309,11 @@ class DiagnosisReportDialog extends ConsumerWidget {
                       onPressed: () {
                         // Mock Download Action
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text("Downloading PDF..."))
+                          SnackBar(content: Text(tr('downloading_pdf')))
                         );
                       },
                       icon: const Icon(Icons.download_rounded),
-                      label: const Text("Download PDF"),
+                      label: Text(tr('download_pdf_button')),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: ColorPalette.emeraldGreen,
                         foregroundColor: Colors.white,
