@@ -1,6 +1,6 @@
-# Gemini 3 Integration Write-Up (Hackathon Submission)
+# Gemini 3.0 Integration
 
-## 📝 Gemini Integration Description (~200 words)
+## 📝 Gemini Integration Description
 
 ---
 
@@ -16,6 +16,35 @@ The yield prediction engine uses Gemini 3.0 Pro's advanced reasoning capabilitie
 Gemini understands agricultural terminology across 6 Indian languages (Tamil, Telugu, Kannada, Malayalam, Hindi, English), enabling farmers to input problems in their native language and receive recommendations back in the same language. This eliminates language barriers—the core blocker for agricultural tech adoption in India.
 
 Without Gemini 3's multimodal strength, reasoning capabilities, and language support, AgriPulse Advisor would be significantly limited. Gemini 3 is not a feature—it's the foundational intelligence that makes this application possible.
+
+---
+
+## Gemini 3.0 Integration Strategy: AgriPulse
+
+AgriPulse is built on a **"Gemini-First" architecture**, natively integrating **Gemini 3.0 Flash** and **Gemini 3.0 Pro** to transform how small-scale farmers manage their livelihoods. By moving beyond simple pattern matching to deep reasoning, AgriPulse acts as an expert human-in-the-loop advisor.
+
+---
+
+## 🏗️ Core Architectural Pillars
+
+### 1. Multimodal Vision Intelligence (Gemini 3.0 Flash)
+We leverage Gemini 3.0 Flash's high-speed multimodal capabilities for the **Crop Doctor** feature. 
+- **The Flow**: Farmers upload a high-resolution photo of a diseased leaf and concurrently describe the symptoms in their local language (Tamil, Hindi, etc.).
+- **The Analysis**: Gemini "sees" visual markers (e.g., chlorosis, fungal lesions) and "listens" to the transcribed ground-truth observations.
+- **Performance**: Provides detailed, context-aware diagnosis and treatment plans in **under 2 seconds**, critical for low-bandwidth rural environments.
+
+### 2. Advanced Reasoning & Refinement (Gemini 3.0 Pro)
+AgriPulse uses Gemini 3.0 Pro for tasks requiring complex situational synthesis:
+- **Yield Prediction**: The model reasons across soil data, historical yields, and 7-day weather forecasts to predict output and identify risks (e.g., advising against irrigation if a rain-front is approaching).
+- **Interactive Refinement**: If a farmer challenges a diagnosis with new evidence (*"the spots are actually purple and sticky"*), Gemini 3.0 Pro re-evaluates the entire context to refine its advice—mimicking a human expert consultation instead of a static lookup.
+
+### 3. Hyper-Contextual Prompt Engineering
+Every AI call is "grounded" in real-world environmental data to improve accuracy:
+- **Situational Awareness**: Automatic injection of live GPS-driven weather (temperature/humidity) into every diagnosis prompt.
+- **Plot History**: AI is informed of past field treatments, acreage, and soil type to ensure recommendations are economically viable and technically sound for the specific farmer.
+
+### 4. Vernacular Voice Intelligence
+AgriPulse supports **6 major Indian languages** (English, Hindi, Tamil, Kannada, Telugu, Malayalam). Gemini’s linguistic reasoning ensures that even technical agricultural advice is translated into simple, culturally relevant instructions for non-English speaking users.
 
 ---
 
@@ -43,3 +72,16 @@ Without Gemini 3's multimodal strength, reasoning capabilities, and language sup
 6. **Trust**: Multimodal analysis prevents hallucinations by grounding recommendations in farmer context
 
 ---
+
+## 🛠️ Technical Model Allocation
+
+| Model Tier | Feature | Primary Capability |
+| :--- | :--- | :--- |
+| **Gemini 3.0 Flash** | Crop Diagnosis | Multimodal Vision + Fast Latency |
+| **Gemini 3.0 Pro** | Yield Prediction | Advanced Reasoning + Climate Synthesis |
+| **Gemini 3.0 Pro** | Diagnosis Refinement | Conversational Contextual Adjustment |
+
+---
+
+## 🎯 Impact
+This integration transforms AgriPulse from a data log into a **dynamic agricultural companion**. By combining the cost-efficiency and speed of Flash with the deep reasoning of Pro, we provide enterprise-grade agricultural expertise to small-scale farmers at scale.
