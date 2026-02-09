@@ -34,12 +34,15 @@ class RecentActivityList extends ConsumerWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              tr.translate('recent_activity'),
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: ColorPalette.textPrimary,
+            Expanded(
+              child: Text(
+                tr.translate('recent_activity'),
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: ColorPalette.textPrimary,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
             TextButton(

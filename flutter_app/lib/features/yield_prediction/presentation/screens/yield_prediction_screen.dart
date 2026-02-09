@@ -104,15 +104,29 @@ class _YieldPredictionScreenState extends ConsumerState<YieldPredictionScreen> {
     dynamic languageNotifier,
     BuildContext context,
   ) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // 1. LEFT COLUMN: Input Cockpit
-        _buildInputColumn(yieldState, yieldNotifier, languageNotifier, context),
-
-        // 2. RIGHT COLUMN: Prediction Result
-        _buildResultColumn(yieldState, languageNotifier),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 700) {
+          // Mobile/Narrow: Stack vertically and make everything scrollable
+          return SingleChildScrollView(
+            child: Column(
+              children: [
+                _buildInputColumn(yieldState, yieldNotifier, languageNotifier, context, isMobile: true),
+                _buildResultColumn(yieldState, languageNotifier, isMobile: true),
+              ],
+            ),
+          );
+        }
+        
+        // Desktop/Wide: Side-by-side Split View
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildInputColumn(yieldState, yieldNotifier, languageNotifier, context),
+            _buildResultColumn(yieldState, languageNotifier),
+          ],
+        );
+      },
     );
   }
 
@@ -120,75 +134,108 @@ class _YieldPredictionScreenState extends ConsumerState<YieldPredictionScreen> {
     YieldState yieldState,
     YieldController yieldNotifier,
     dynamic languageNotifier,
-    BuildContext context,
-  ) {
+    BuildContext context, {
+    bool isMobile = false,
+  }) {
+    final content = Container(
+      color: ColorPalette.offWhite,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // If in mobile, we don't want the inner scroll view to be Expanded
+          // because the outer one handles it.
+          if (!isMobile)
+            Expanded(
+              child: _buildInputContent(yieldState, yieldNotifier, languageNotifier, context),
+            )
+          else
+            _buildInputContent(yieldState, yieldNotifier, languageNotifier, context, isMobile: isMobile),
+          
+          _buildPredictionButton(yieldState, yieldNotifier, languageNotifier, context),
+          _buildSystemHealthCard(languageNotifier),
+        ],
+      ),
+    );
+
+    if (isMobile) return content;
+    
     return Expanded(
       flex: 4,
-      child: Container(
-        color: ColorPalette.offWhite,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        const Icon(Icons.layers_outlined, size: 16, color: ColorPalette.textPrimary),
-                        const SizedBox(width: 8),
-                        Text(
-                          languageNotifier.translate('field_parameters').toUpperCase(),
-                          style: GoogleFonts.outfit(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: ColorPalette.textPrimary,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    
-                    _buildParameterSelectionRows(yieldState, yieldNotifier, languageNotifier),
-                    
-                    if (yieldState.expectedHarvestDate != null && 
-                        yieldState.expectedHarvestDate!.difference(DateTime.now()).inDays > 14)
-                      _buildHarvestWarning(languageNotifier),
-                      
-                    const SizedBox(height: 32),
-                    _buildPredictionButton(yieldState, yieldNotifier, languageNotifier, context),
-                    const SizedBox(height: 32),
-                  ],
-                ),
-              ),
-            ),
-            _buildSystemHealthCard(languageNotifier),
-          ],
-        ),
-      ),
+      child: content,
     );
   }
 
-  Widget _buildResultColumn(YieldState yieldState, dynamic languageNotifier) {
+  Widget _buildInputContent(
+    YieldState yieldState,
+    YieldController yieldNotifier,
+    dynamic languageNotifier,
+    BuildContext context, {
+    bool isMobile = false,
+  }) {
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            const Icon(Icons.layers_outlined, size: 16, color: ColorPalette.textPrimary),
+            const SizedBox(width: 8),
+            Text(
+              languageNotifier.translate('field_parameters').toUpperCase(),
+              style: GoogleFonts.outfit(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: ColorPalette.textPrimary,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        
+        _buildParameterSelectionRows(yieldState, yieldNotifier, languageNotifier, isMobile: isMobile),
+        
+        if (yieldState.expectedHarvestDate != null && 
+            yieldState.expectedHarvestDate!.difference(DateTime.now()).inDays > 14)
+          _buildHarvestWarning(languageNotifier),
+          
+        const SizedBox(height: 32),
+      ],
+    );
+
+    if (isMobile) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24.0),
+        child: content,
+      );
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+      child: content,
+    );
+  }
+
+  Widget _buildResultColumn(YieldState yieldState, dynamic languageNotifier, {bool isMobile = false}) {
+    final content = Container(
+      color: Colors.white,
+      child: yieldState.isLoading
+          ? _buildLoadingState()
+          : yieldState.errorMessage != null
+              ? _buildErrorState(yieldState.errorMessage!)
+              : yieldState.result != null
+                  ? YieldResultView(
+                      result: yieldState.result!,
+                      cropName: yieldState.cropName!,
+                      fieldArea: yieldState.fieldArea!,
+                    )
+                  : _buildResultPlaceholder(isMobile: isMobile),
+    );
+
+    if (isMobile) return content;
+
     return Expanded(
       flex: 8,
-      child: Container(
-        color: Colors.white,
-        child: yieldState.isLoading
-            ? _buildLoadingState()
-            : yieldState.errorMessage != null
-                ? _buildErrorState(yieldState.errorMessage!)
-                : yieldState.result != null
-                    ? YieldResultView(
-                        result: yieldState.result!,
-                        cropName: yieldState.cropName!,
-                        fieldArea: yieldState.fieldArea!,
-                      )
-                    : _buildResultPlaceholder(),
-      ),
+      child: content,
     );
   }
 
@@ -247,65 +294,74 @@ class _YieldPredictionScreenState extends ConsumerState<YieldPredictionScreen> {
     );
   }
 
-  Widget _buildResultPlaceholder() {
+  Widget _buildResultPlaceholder({bool isMobile = false}) {
     String tr(String key) => ref.read(languageProvider.notifier).translate(key);
+
+    final content = Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const SizedBox(height: 80),
+        Icon(
+          Icons.auto_awesome_rounded,
+          size: 80,
+          color: ColorPalette.emeraldGreen.withValues(alpha: 0.1),
+        ).animate(onPlay: (controller) => controller.repeat())
+         .shimmer(duration: 2000.ms, color: ColorPalette.mintGreen.withValues(alpha: 0.2)),
+        const SizedBox(height: 32),
+        Text(
+          tr('climate_aware_forecasting'),
+          textAlign: TextAlign.center,
+          style: GoogleFonts.outfit(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: ColorPalette.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          "${tr('ai_engine_reasoning')}\n\n• ${tr('reasoning_factor_1')}\n• ${tr('reasoning_factor_2')}\n• ${tr('reasoning_factor_3')}\n• ${tr('reasoning_factor_4')}",
+          textAlign: TextAlign.center,
+          style: GoogleFonts.outfit(
+            fontSize: 15,
+            color: ColorPalette.textSecondary,
+            height: 1.6,
+          ),
+        ),
+         const SizedBox(height: 48),
+         Container(
+           padding: const EdgeInsets.all(20),
+           decoration: BoxDecoration(
+             color: ColorPalette.offWhite,
+             borderRadius: BorderRadius.circular(16),
+             border: Border.all(color: Colors.grey.shade200),
+           ),
+           // Info Bar
+           child: Row(
+             children: [
+               const Icon(Icons.info_outline_rounded, color: ColorPalette.emeraldGreen),
+               const SizedBox(width: 16),
+               Expanded(
+                 child: Text(
+                   "Your data helps us build a more resilient agricultural future for the community.",
+                   style: GoogleFonts.outfit(fontSize: 13, color: ColorPalette.textSecondary),
+                 ),
+               ),
+             ],
+           ),
+         ),
+      ],
+    );
+
+    if (isMobile) {
+      return Padding(
+        padding: const EdgeInsets.all(24),
+        child: content,
+      );
+    }
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(48),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const SizedBox(height: 80),
-          Icon(
-            Icons.auto_awesome_rounded,
-            size: 80,
-            color: ColorPalette.emeraldGreen.withValues(alpha: 0.1),
-          ).animate(onPlay: (controller) => controller.repeat())
-           .shimmer(duration: 2000.ms, color: ColorPalette.mintGreen.withValues(alpha: 0.2)),
-          const SizedBox(height: 32),
-          Text(
-            tr('climate_aware_forecasting'),
-            textAlign: TextAlign.center,
-            style: GoogleFonts.outfit(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: ColorPalette.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            "${tr('ai_engine_reasoning')}\n\n• ${tr('reasoning_factor_1')}\n• ${tr('reasoning_factor_2')}\n• ${tr('reasoning_factor_3')}\n• ${tr('reasoning_factor_4')}",
-            textAlign: TextAlign.center,
-            style: GoogleFonts.outfit(
-              fontSize: 15,
-              color: ColorPalette.textSecondary,
-              height: 1.6,
-            ),
-          ),
-           const SizedBox(height: 48),
-           Container(
-             padding: const EdgeInsets.all(20),
-             decoration: BoxDecoration(
-               color: ColorPalette.offWhite,
-               borderRadius: BorderRadius.circular(16),
-               border: Border.all(color: Colors.grey.shade200),
-             ),
-             // Info Bar
-             child: Row(
-               children: [
-                 const Icon(Icons.info_outline_rounded, color: ColorPalette.emeraldGreen),
-                 const SizedBox(width: 16),
-                 Expanded(
-                   child: Text(
-                     "Your data helps us build a more resilient agricultural future for the community.",
-                     style: GoogleFonts.outfit(fontSize: 13, color: ColorPalette.textSecondary),
-                   ),
-                 ),
-               ],
-             ),
-           ),
-        ],
-      ),
+      child: content,
     );
   }
 
@@ -403,11 +459,14 @@ class _YieldPredictionScreenState extends ConsumerState<YieldPredictionScreen> {
           children: [
             Icon(icon ?? Icons.calendar_today_rounded, size: 18, color: ColorPalette.textSecondary.withValues(alpha: 0.6)),
             const SizedBox(width: 12),
-            Text(
-              selectedDate != null ? DateFormat('MM/dd/yyyy').format(selectedDate) : "MM/DD/YYYY",
-              style: GoogleFonts.outfit(
-                color: selectedDate != null ? ColorPalette.textPrimary : ColorPalette.textSecondary.withValues(alpha: 0.4),
-                fontSize: 14,
+            Flexible(
+              child: Text(
+                selectedDate != null ? DateFormat('MM/dd/yyyy').format(selectedDate) : "MM/DD/YYYY",
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.outfit(
+                  color: selectedDate != null ? ColorPalette.textPrimary : ColorPalette.textSecondary.withValues(alpha: 0.4),
+                  fontSize: 14,
+                ),
               ),
             ),
           ],
@@ -583,8 +642,61 @@ class _YieldPredictionScreenState extends ConsumerState<YieldPredictionScreen> {
   Widget _buildParameterSelectionRows(
     YieldState yieldState,
     YieldController yieldNotifier,
-    dynamic languageNotifier,
-  ) {
+    dynamic languageNotifier, {
+    bool isMobile = false,
+  }) {
+    final dateSection = isMobile 
+      ? Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildLabel(languageNotifier.translate('planted_date')),
+            _buildDatePicker(
+              selectedDate: yieldState.plantedDate,
+              onChanged: yieldNotifier.updatePlantedDate,
+              icon: Icons.calendar_today_rounded,
+            ),
+            const SizedBox(height: 16),
+            _buildLabel(languageNotifier.translate('expected_harvest_date')),
+            _buildDatePicker(
+              selectedDate: yieldState.expectedHarvestDate,
+              onChanged: yieldNotifier.updateExpectedHarvestDate,
+              icon: Icons.calendar_today_rounded,
+            ),
+          ],
+        )
+      : Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildLabel(languageNotifier.translate('planted_date')),
+                  _buildDatePicker(
+                    selectedDate: yieldState.plantedDate,
+                    onChanged: yieldNotifier.updatePlantedDate,
+                    icon: Icons.calendar_today_rounded,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildLabel(languageNotifier.translate('expected_harvest_date')),
+                  _buildDatePicker(
+                    selectedDate: yieldState.expectedHarvestDate,
+                    onChanged: yieldNotifier.updateExpectedHarvestDate,
+                    icon: Icons.calendar_today_rounded,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -624,38 +736,7 @@ class _YieldPredictionScreenState extends ConsumerState<YieldPredictionScreen> {
         const SizedBox(height: 24),
 
         // Row 4: Dates
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildLabel(languageNotifier.translate('planted_date')),
-                  _buildDatePicker(
-                    selectedDate: yieldState.plantedDate,
-                    onChanged: yieldNotifier.updatePlantedDate,
-                    icon: Icons.calendar_today_rounded,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildLabel(languageNotifier.translate('expected_harvest_date')),
-                  _buildDatePicker(
-                    selectedDate: yieldState.expectedHarvestDate,
-                    onChanged: yieldNotifier.updateExpectedHarvestDate,
-                    icon: Icons.calendar_today_rounded,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+        dateSection,
       ],
     );
   }

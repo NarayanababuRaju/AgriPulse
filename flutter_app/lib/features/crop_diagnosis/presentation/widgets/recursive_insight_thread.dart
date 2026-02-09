@@ -8,8 +8,15 @@ import '../../../../core/localization/language_provider.dart';
 
 class RecursiveInsightThread extends ConsumerWidget {
   final List<ThreadItem> thread;
+  final ScrollPhysics? physics;
+  final bool shrinkWrap;
 
-  const RecursiveInsightThread({super.key, required this.thread});
+  const RecursiveInsightThread({
+    super.key, 
+    required this.thread,
+    this.physics,
+    this.shrinkWrap = false,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -29,6 +36,8 @@ class RecursiveInsightThread extends ConsumerWidget {
 
     return ListView.separated(
       controller: scrollController,
+      physics: physics,
+      shrinkWrap: shrinkWrap,
       padding: const EdgeInsets.all(16),
       itemCount: thread.length,
       separatorBuilder: (context, index) => const SizedBox(height: 16),

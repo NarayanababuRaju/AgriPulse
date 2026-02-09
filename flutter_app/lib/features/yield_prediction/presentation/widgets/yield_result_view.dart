@@ -31,68 +31,125 @@ class YieldResultView extends ConsumerWidget {
     ref.watch(languageProvider);
     final languageNotifier = ref.read(languageProvider.notifier);
 
-    return Padding(
-      padding: const EdgeInsets.all(24.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 1. LEFT COLUMN: Metrics & Financial Story
-          Expanded(
-            flex: 4,
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildYieldSection(result, languageNotifier),
-                  const SizedBox(height: 32),
-                  _buildContextualInsightsContent(result.contextualInsights, languageNotifier),
-                  const SizedBox(height: 32),
-                  _buildFinancialSection(ref),
-                ],
-              ),
-            ),
-          ),
-          
-          const SizedBox(width: 32),
-
-          // 2. RIGHT COLUMN: Evidence & Strategy
-          Expanded(
-            flex: 8,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 600;
+        
+        if (isMobile) {
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Top: Fixed Trajectory Chart
+                _buildYieldSection(result, languageNotifier, isMobile: true),
+                const SizedBox(height: 24),
+                _buildContextualInsightsContent(result.contextualInsights, languageNotifier, isMobile: true),
+                const SizedBox(height: 24),
                 YieldChartWidget(dailyForecast: result.dailyForecast),
                 const SizedBox(height: 24),
-                // Bottom: Scrollable Strategy (Factors + Recommendations)
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.grey.shade100),
-                    ),
-                    child: SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildFactorsCard(result, languageNotifier),
-                          const SizedBox(height: 24),
-                          _buildRecommendationsCard(result, languageNotifier),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
+                _buildFactorsCard(result, languageNotifier),
+                const SizedBox(height: 24),
+                _buildRecommendationsCard(result, languageNotifier),
+                const SizedBox(height: 24),
+                _buildFinancialSection(ref),
               ],
             ),
+          );
+        }
+
+        return Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 1. LEFT COLUMN: Metrics & Financial Story
+              Expanded(
+                flex: 4,
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildYieldSection(result, languageNotifier),
+                      const SizedBox(height: 32),
+                      _buildContextualInsightsContent(result.contextualInsights, languageNotifier),
+                      const SizedBox(height: 32),
+                      _buildFinancialSection(ref),
+                    ],
+                  ),
+                ),
+              ),
+              
+              const SizedBox(width: 32),
+
+              // 2. RIGHT COLUMN: Evidence & Strategy
+              Expanded(
+                flex: 8,
+                child: Column(
+                  children: [
+                    YieldChartWidget(dailyForecast: result.dailyForecast),
+                    const SizedBox(height: 24),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.grey.shade100),
+                        ),
+                        child: SingleChildScrollView(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildFactorsCard(result, languageNotifier),
+                              const SizedBox(height: 24),
+                              _buildRecommendationsCard(result, languageNotifier),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     ).animate().fadeIn(duration: 800.ms);
   }
 
-  Widget _buildYieldSection(YieldPrediction result, dynamic languageNotifier) {
+  Widget _buildYieldSection(YieldPrediction result, dynamic languageNotifier, {bool isMobile = false}) {
+    final content = Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          flex: 3,
+          child: _buildYield(result, languageNotifier),
+        ),
+        Container(
+          height: 60,
+          width: 1,
+          color: Colors.grey.shade100,
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+        ),
+        Expanded(
+          flex: 4,
+          child: _buildConfidenceIndicator(result, languageNotifier),
+        ),
+      ],
+    );
+
+    final mobileContent = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildYield(result, languageNotifier),
+        const SizedBox(height: 20),
+        const Divider(height: 1),
+        const SizedBox(height: 20),
+        _buildConfidenceIndicator(result, languageNotifier),
+      ],
+    );
+
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -107,25 +164,7 @@ class YieldResultView extends ConsumerWidget {
           ),
         ],
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            flex: 3,
-            child: _buildYield(result, languageNotifier),
-          ),
-          Container(
-            height: 60,
-            width: 1,
-            color: Colors.grey.shade100,
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-          ),
-          Expanded(
-            flex: 4,
-            child: _buildConfidenceIndicator(result, languageNotifier),
-          ),
-        ],
-      ),
+      child: isMobile ? mobileContent : content,
     );
   }
 
@@ -326,7 +365,7 @@ class YieldResultView extends ConsumerWidget {
   }
 
 
-  Widget _buildContextualInsightsContent(List<InsightCard> insights, dynamic languageNotifier) {
+  Widget _buildContextualInsightsContent(List<InsightCard> insights, dynamic languageNotifier, {bool isMobile = false}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -346,7 +385,7 @@ class YieldResultView extends ConsumerWidget {
           runSpacing: 8,
           children: insights.map((insight) => _ContextualInsightCard(
             insight: insight,
-            width: 145, 
+            width: isMobile ? 135 : 145, 
           )).toList(),
         ),
       ],
