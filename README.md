@@ -17,16 +17,36 @@ AgriPulse empowers small-scale farmers in rural India to make **data-driven agri
 - 🌤️ **Weather-aware recommendations** based on real-time forecasts
 - 📊 **Yield prediction** using advanced AI reasoning
 - 💰 **Cost-benefit analysis** for treatment decisions
-- 🏛️ **Government scheme matching** for subsidies and financial support
-- ♻️ **Sustainable farming practices** for eco-friendly agriculture
 
 ---
 
 ## 🚀 Live Demo
-**Application URL**: [https://agri-pulse-firebase.web.app](https://agri-pulse-firebase.web.app)
+**Application URL**: [https://agri-pulse-firebase.web.app](https://agri-pulse-firebase.web.app)  
 **Demo Video**: [Watch the Project Walkthrough](https://youtu.be/y7ltx-xm-vg)
 
 ---
+
+### 🧪 Testing the Demo
+
+**For Judges & Evaluators:**  
+We've provided sample crop disease images to test the AI Crop Doctor feature:
+
+**Sample Images:**
+- [Basal Rot](data/raw/BasalRot) - Onion bulb disease
+- [Downy Mildew](data/raw/DownyMildew) - Fungal leaf infection
+- [Leaf Blight](data/raw/LeafBlight) - Common leaf disease
+- [Purple Blotch](data/raw/PurpleBlotch) - Onion leaf spots
+- [Pythium Root Rot](data/raw/PythiumRootRot) - Root system disease
+- [Smut](data/raw/Smut) - Fungal disease
+- [White Rot](data/raw/WhiteRot) - Soil-borne disease
+
+**How to Test:**
+1. Visit [https://agri-pulse-firebase.web.app](https://agri-pulse-firebase.web.app)
+2. Click **"Skip Login (Demo Mode)"** on the login screen
+3. Navigate to **"Crop Doctor"** from the dashboard
+4. Upload one of the sample images from the links above
+5. Describe symptoms via voice or text (optional)
+6. View the AI-generated diagnosis and treatment plan in seconds
 
 ---
 
@@ -50,14 +70,12 @@ AgriPulse empowers small-scale farmers in rural India to make **data-driven agri
 
 ---
 
----
-
 ## 🏗️ System Architecture
 
 
 ![High-Resolution System Architecture](docs/assets/system_architecture.png)
 
-**View detailed architecture documentation**: [SYSTEM_ARCHITECTURE_C4.md](docs/SYSTEM_ARCHITECTURE_C4.md)
+![Detailed system architecture](docs/assets/Phase_1_Architecture.png)
 
 ---
 
@@ -68,27 +86,34 @@ AgriPulse follows a modular, feature-first architecture to ensure scalability ac
 ```text
 
 AgriPulse/
-├── backend/                # Python FastAPI Backend
+├── backend/                          # Python FastAPI Backend
 │   ├── app/
-│   │   ├── api/            # Route handlers (auth, diagnosis, yield)
-│   │   ├── services/       # AI logic (Gemini, STT/TTS, Weather)
-│   │   ├── db/             # Firestore repository patterns
-│   │   └── main.py         # Application entry point
-│   └── tests/              # E2E and Unit test suite
-├── flutter_app/            # Flutter Web Frontend
+│   │   ├── api/                      # Route handlers (auth, diagnosis, yield)
+│   │   ├── services/                 # AI logic (Gemini, STT/TTS, Weather)
+│   │   ├── db/                       # Firestore repository patterns
+│   │   └── main.py                   # Application entry point
+│   └── tests/                        # E2E and Unit test suite
+├── flutter_app/                      # Flutter Web Frontend
 │   ├── lib/
-│   │   ├── core/           # Routing, Localization, Theme, Widgets
-│   │   └── features/       # Feature-driven UI:
-│   │       ├── auth/       # OTP Login & Demo Bypass
-│   │       ├── crop_diagnosis/  # Image analysis & AI Chat
-│   │       ├── dashboard/       # Pane-based Command Center
-│   │       └── yield_prediction/ # Estimator & Results Display
-│   └── web/                # Web-specific configurations
-└── docs/                   # Specifications and Architecture
+│   │   ├── core/                     # Routing, Localization, Theme, Widgets
+│   │   └── features/                 # Feature-driven UI:
+│   │       ├── auth/                 # OTP Login & Demo Bypass
+│   │       ├── crop_diagnosis/       # Image analysis & AI Chat
+│   │       ├── dashboard/            # Pane-based Command Center
+│   │       └── yield_prediction/     # Estimator & Results Display
+│   └── web/                          # Web-specific configurations
+├── data/                             # Sample Data & Assets
+│   └── raw/                          # Sample crop disease images for testing
+│       ├── BasalRot/                 # Onion bulb disease samples
+│       ├── DownyMildew/              # Fungal leaf infection samples
+│       ├── LeafBlight/               # Common leaf disease samples
+│       ├── PurpleBlotch/             # Onion leaf spot samples
+│       ├── PythiumRootRot/           # Root system disease samples
+│       ├── Smut/                     # Fungal disease samples
+│       └── WhiteRot/                 # Soil-borne disease samples
+└── docs/                             # Specifications and Architecture
 
 ```
-
----
 
 ---
 
@@ -276,7 +301,6 @@ This project is licensed under the **MIT License** - see [LICENSE](LICENSE) file
 
 ---
 
----
 
 ## ✅ Current Status
 
@@ -295,7 +319,7 @@ This project is licensed under the **MIT License** - see [LICENSE](LICENSE) file
     - **Crop Doctor**: Integrated Multimodal diagnosis & TTS playback
     - **Yield Estimator**: Interactive forms with financial charts
     - **Localization**: Full support for 6 Indian languages
-    - ✅ **Testing**: All API endpoints tested (3/3 passing)
+    - ✅ **Testing**: All API endpoints tested (34/34 passing)
 - ✅ **Real-World Validation**: Successfully analyzed actual onion disease images
   - Basal Rot: 95% confidence
   - Pythium Root Rot: 92% confidence
@@ -314,7 +338,7 @@ This project is licensed under the **MIT License** - see [LICENSE](LICENSE) file
 
 ---
 
-*Date Created: December 17, 2025*
-*Last Updated: February 8, 2026*
+*Date Created: January 26, 2026*
+*Last Updated: February 9, 2026*
 
 ---

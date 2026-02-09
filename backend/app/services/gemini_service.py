@@ -272,10 +272,10 @@ Return your response as a valid JSON object.
             return {
                 "status": "success",
                 "prediction": prediction_data,
-                "model_used": "gemini-1.5-pro"
+                "model_used": "gemini-3.0-pro"
             }
         except Exception as e:
-            logger.error(f"1.5 Pro yield prediction failed: {str(e)}")
+            logger.error(f"3.0 Pro yield prediction failed: {str(e)}")
             return {"status": "error", "error": str(e)}
 
     # =========================================================================

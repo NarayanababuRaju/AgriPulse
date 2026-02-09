@@ -93,13 +93,18 @@ yarn-error.log*
 .dart_tool/
 
 # Data files (training images, too large for git)
-data/raw/
-data/processed/
 *.jpg
 *.jpeg
 *.png
 !docs/assets/*.png
 !mobile/assets/*.png
+!data/raw/BasalRot/*.jpg
+!data/raw/DownyMildew/*.jpg
+!data/raw/LeafBlight/*.jpg
+!data/raw/PurpleBlotch/*.jpg
+!data/raw/PythiumRootRot/*.jpg
+!data/raw/Smut/*.jpg
+!data/raw/WhiteRot/*.jpg
 
 # Other
 .env*

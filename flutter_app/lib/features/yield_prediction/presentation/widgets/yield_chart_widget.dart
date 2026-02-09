@@ -18,7 +18,7 @@ class YieldChartWidget extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Watch language state to trigger rebuilds on language change
-    ref.watch(languageProvider);
+    final languageState = ref.watch(languageProvider);
     final languageNotifier = ref.read(languageProvider.notifier);
     return Container(
       height: 320,
@@ -55,7 +55,7 @@ class YieldChartWidget extends ConsumerWidget {
                     tooltipBgColor: ColorPalette.textPrimary,
                     getTooltipItem: (group, groupIndex, rod, rodIndex) {
                       final dayData = dailyForecast[groupIndex];
-                      final dayLabel = _getDayLabel(groupIndex, languageNotifier);
+                      final dayLabel = _getDayLabel(groupIndex, languageNotifier, languageState.code);
                       return BarTooltipItem(
                         "$dayLabel: ${dayData.temp}°C\n${dayData.condition}\nPotential: ${dayData.yieldPotential.toInt()}%",
                         GoogleFonts.outfit(color: Colors.white, fontSize: 11),
@@ -70,7 +70,7 @@ class YieldChartWidget extends ConsumerWidget {
                       showTitles: true,
                       getTitlesWidget: (value, meta) {
                         if (value < 0 || value >= dailyForecast.length) return const SizedBox();
-                        final dayLabel = _getDayLabel(value.toInt(), languageNotifier);
+                        final dayLabel = _getDayLabel(value.toInt(), languageNotifier, languageState.code);
                         return Padding(
                           padding: const EdgeInsets.only(top: 8.0),
                           child: Text(
@@ -150,17 +150,13 @@ class YieldChartWidget extends ConsumerWidget {
     );
   }
 
-  String _getDayLabel(int index, dynamic languageNotifier) {
+  String _getDayLabel(int index, dynamic languageNotifier, String localeCode) {
     final now = DateTime.now();
     final targetDate = now.add(Duration(days: index));
     
     if (index == 0) return languageNotifier.translate('today');
     if (index == 1) return languageNotifier.translate('tomorrow');
     
-    // For other days, use the short weekday name with appropriate locale
-    final String localeCode = (languageNotifier is LanguageNotifier) 
-        ? languageNotifier.state.code 
-        : 'en';
     return DateFormat('EEE', localeCode).format(targetDate);
   }
 }

@@ -65,28 +65,34 @@ class FarmerDashboardScreen extends ConsumerWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "${tr('hello')},", 
-                            style: GoogleFonts.outfit(
-                              fontSize: 16,
-                              color: ColorPalette.textSecondary,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "${tr('hello')},", 
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.outfit(
+                                fontSize: 16,
+                                color: ColorPalette.textSecondary,
+                              ),
                             ),
-                          ),
-                          Text(
-                            activeField != null && activeField.id != PathEnforcer.unassignedFieldId
-                              ? "${user?.name ?? "Raju"} • ${activeField.name}"
-                              : user?.name ?? "Raju", 
-                            style: GoogleFonts.outfit(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: ColorPalette.textPrimary,
+                            Text(
+                              activeField != null && activeField.id != PathEnforcer.unassignedFieldId
+                                ? "${user?.name ?? "Raju"} • ${activeField.name}"
+                                : user?.name ?? "Raju", 
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                              style: GoogleFonts.outfit(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: ColorPalette.textPrimary,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
+                      const SizedBox(width: 8),
                       Row(
                         children: [
                           const LanguageSelector(
@@ -214,10 +220,10 @@ class FarmerDashboardScreen extends ConsumerWidget {
                           const SizedBox(height: 16),
 
                           // RECENT ACTIVITY (Middle Priority)
-                          Expanded(
+                          const Expanded(
                             flex: 4,
                             child: Padding(
-                               padding: const EdgeInsets.only(bottom: 16),
+                               padding: EdgeInsets.only(bottom: 16),
                                child: RecentActivityList(),
                             ),
                           ),
@@ -304,7 +310,7 @@ class FarmerDashboardScreen extends ConsumerWidget {
   Widget _buildComingSoonSection(dynamic tr, {required int crossAxisCount, required double availableWidth}) {
     // Calculate card width based on available width and column count
     // Subtract spacing (10px gap * (count - 1))
-    final double spacing = 10;
+    const double spacing = 10;
     final double cardWidth = (availableWidth - (spacing * (crossAxisCount - 1))) / crossAxisCount;
 
     return Column(
@@ -361,29 +367,7 @@ class FarmerDashboardScreen extends ConsumerWidget {
     );
   }
 
-  /// Builds a compact version of the ActionCard for the horizontal list
-  Widget _buildCompactActionCard(
-    BuildContext context, {
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required Color color,
-    required VoidCallback onTap,
-    required int delay,
-  }) {
-    return SizedBox(
-      width: 220, // Increased from 150 to better fit local language text
-      child: ActionCard(
-        title: title,
-        subtitle: subtitle,
-        icon: icon,
-        color: color,
-        onTap: onTap,
-        // We can pass isPrimary if needed, or default to false for uniform look
-        isPrimary: false, 
-      ),
-    ).animate().scale(delay: delay.ms, duration: 400.ms, curve: Curves.easeOutBack);
-  }
+
 
   /// Builds the profile button with a popup menu for Logout
   Widget _buildProfileButton(BuildContext context, WidgetRef ref) {

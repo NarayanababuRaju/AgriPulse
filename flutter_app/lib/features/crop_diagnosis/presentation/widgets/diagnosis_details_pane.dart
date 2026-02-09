@@ -208,7 +208,7 @@ class DiagnosisDetailsPane extends ConsumerWidget {
                         return _buildActionCard(
                           isRefinedView ? tr.translate('treatment_adjustment_label') : tr.translate('ai_recommendation'), 
                           isRefinedView 
-                            ? (adjustment ?? summary)
+                            ? adjustment
                             : (adjustment != null 
                                 ? _deduplicateTreatment(summary, adjustment)
                                 : summary), 
@@ -314,7 +314,7 @@ class DiagnosisDetailsPane extends ConsumerWidget {
                                   return _buildActionCardContent(
                                     isRefinedView ? tr.translate('treatment_adjustment_label') : tr.translate('ai_recommendation'), 
                                     isRefinedView 
-                                      ? (adjustment ?? summary)
+                                      ? adjustment
                                       : (adjustment != null 
                                           ? _deduplicateTreatment(summary, adjustment)
                                           : summary), 

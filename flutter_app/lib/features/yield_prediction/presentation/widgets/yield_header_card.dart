@@ -9,66 +9,77 @@ class YieldHeaderCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-        border: Border.all(color: Colors.grey.shade100),
-      ),
-      child: Row(
-        children: [
-          // Branding
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: ColorPalette.emeraldGreen,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(Icons.grass_rounded, color: Colors.white, size: 24),
-          ),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                "AgriPulse AI",
-                style: GoogleFonts.outfit(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: ColorPalette.textPrimary,
-                ),
-              ),
-              Text(
-                "YIELD PREDICTOR ENGINE",
-                style: GoogleFonts.outfit(
-                  fontSize: 9,
-                  letterSpacing: 1.0,
-                  fontWeight: FontWeight.w600,
-                  color: ColorPalette.textSecondary,
-                ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 600;
+
+        return Container(
+          margin: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
             ],
+            border: Border.all(color: Colors.grey.shade100),
           ),
-          
-          const SizedBox(width: 24),
-          
-          // Weather Forecast (Mini)
-          const MiniForecastWidget(),
-          
-          const Spacer(),
-        
-        ],
-      ),
+          child: Row(
+            children: [
+              // Branding
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: ColorPalette.emeraldGreen,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.grass_rounded, color: Colors.white, size: 24),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      "AgriPulse AI",
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.outfit(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: ColorPalette.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      "YIELD PREDICTOR ENGINE",
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.outfit(
+                        fontSize: 9,
+                        letterSpacing: 1.0,
+                        fontWeight: FontWeight.w600,
+                        color: ColorPalette.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              if (!isCompact) ...[
+                const SizedBox(width: 24),
+                // Weather Forecast (Mini)
+                const MiniForecastWidget(),
+              ],
+              
+              const Spacer(),
+            
+            ],
+          ),
+        );
+      },
     );
   }
 }

@@ -151,187 +151,217 @@ class _CropDoctorScreenState extends ConsumerState<CropDoctorScreen> {
           Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24.0),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-            // ============================================
-            // 1. LEFT COLUMN: Input Cockpit & Context (Flex 1)
-            // ============================================
-            Expanded(
-              flex: 1,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Top Row (1/3): Horizontal Input Split
-                  SizedBox(
-                    height: 280, // Adjusted height for top horizontal row
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // Left: Image Picker
-                        Expanded(
-                          flex: 1,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: diagnosisState.imageFile == null 
-                                    ? Colors.grey.withValues(alpha: 0.3) 
-                                    : ColorPalette.emeraldGreen,
-                                width: 1.5,
-                              ),
-                            ),
-                            child: diagnosisState.imageFile == null
-                                ? _buildPicker(context, controller, tr)
-                                : _buildPreview(context, controller, diagnosisState, tr),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        // Right: Text/Voice Input
-                        Expanded(
-                          flex: 1,
-                          child: _buildVoicePanel(controller, tr),
-                        ),
-                      ],
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // Bottom Grid (2/3): Analysis & Challenge side-by-side
-                  Expanded(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Analysis Cards Sub-Col
-                        Expanded(
-                          child: SingleChildScrollView(
-                            child: Column(
-                              children: [
-                                _buildModularSection(
-                                  title: tr('irrigation_stage'),
-                                  icon: Icons.water_drop_outlined,
-                                  child: _buildIrrigationChips(diagnosisState, controller, tr),
-                                ),
-                                const SizedBox(height: 12),
-                                _buildModularSection(
-                                  title: tr('leaf_texture'),
-                                  icon: Icons.texture_outlined,
-                                  child: _buildTextureChips(diagnosisState, controller, tr),
-                                ),
-                                const SizedBox(height: 12),
-                                _buildModularSection(
-                                  title: tr('soil_moisture'),
-                                  icon: Icons.waves_outlined,
-                                  child: _buildSoilChips(diagnosisState, controller, tr),
-                                ),
-                                const SizedBox(height: 12),
-                                _buildModularSection(
-                                  title: tr('weather_events'),
-                                  icon: Icons.cloud_outlined,
-                                  child: _buildWeatherChips(diagnosisState, controller, tr),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        
-                        const SizedBox(width: 12),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  if (constraints.maxWidth < 700) {
+                    return SingleChildScrollView(
+                      child: Column(
+                        children: [
+                          _buildLeftPanel(diagnosisState, controller, tr, isMobile: true),
+                          const SizedBox(height: 24),
+                          _buildRightPanel(diagnosisState, controller, tr, isMobile: true, context: context),
+                        ],
+                      ),
+                    );
+                  }
 
-                        // Challenge Cards Sub-Col
-                        Expanded(
-                          child: SingleChildScrollView(
-                            child: Column(
-                              children: [
-                                _buildModularSection(
-                                  title: tr('odor_presence'),
-                                  icon: Icons.air_outlined,
-                                  child: _buildOdorChips(diagnosisState, controller, tr),
-                                ),
-                                const SizedBox(height: 12),
-                                _buildModularSection(
-                                  title: tr('spread_pattern'),
-                                  icon: Icons.grid_view_outlined,
-                                  child: _buildSpreadChips(diagnosisState, controller, tr),
-                                ),
-                                const SizedBox(height: 12),
-                                _buildModularSection(
-                                  title: tr('speed_of_spread'),
-                                  icon: Icons.speed_outlined,
-                                  child: _buildSpeedChipsChallenge(diagnosisState, controller, tr),
-                                ),
-                                const SizedBox(height: 12),
-                                _buildModularSection(
-                                  title: tr('intervention_log'),
-                                  icon: Icons.history_edu_outlined,
-                                  child: _buildInterventionChips(diagnosisState, controller, tr),
-                                ),
-                                if (diagnosisState.diagnosisResult != null) ...[
-                                  const SizedBox(height: 12),
-                                  _buildActionButtons(diagnosisState, controller, tr),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  if (diagnosisState.diagnosisResult == null) ...[
-                    const SizedBox(height: 16),
-                    _buildActionButtons(diagnosisState, controller, tr),
-                  ],
-                ],
-              ),
-            ),
-            
-            const SizedBox(width: 32),
-            
-            // ============================================
-            // 2. RIGHT COLUMN: Analysis & Conversation (Flex 1)
-            // ============================================
-            Expanded(
-              flex: 1,
-              child: Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: diagnosisState.isAnalyzing
-                  ? _buildAnalyzingPlaceholder(tr)
-                  : diagnosisState.diagnosisResult == null
-                  ? _buildResultPlaceholder(tr)
-                  : Column(
-                      children: [
-                        // Pinned Top: Treatment Hub
-                        _buildTreatmentSummaryCard(context, ref, diagnosisState.diagnosisResult!, tr),
-                        const SizedBox(height: 16),
-                        
-                        // Expanded Bottom: Chat Thread
-                        Expanded(
-                          child: RecursiveInsightThread(thread: diagnosisState.conversationThread),
-                        ),
-                      ],
-                    ),
-              ),
-            ),
-                ],
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        flex: 1,
+                        child: _buildLeftPanel(diagnosisState, controller, tr),
+                      ),
+                      const SizedBox(width: 32),
+                      Expanded(
+                        flex: 1,
+                        child: _buildRightPanel(diagnosisState, controller, tr, context: context),
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildLeftPanel(DiagnosisState diagnosisState, DiagnosisController controller, String Function(String) tr, {bool isMobile = false}) {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+        // Top Row/Column: Input Split
+        if (isMobile)
+          Column(
+            children: [
+              SizedBox(
+                height: 320,
+                child: _buildVideoImageInput(diagnosisState, controller, tr),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                height: 180,
+                child: _buildVoicePanel(controller, tr),
+              ),
+            ],
+          )
+        else
+          SizedBox(
+            height: 280,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: _buildVideoImageInput(diagnosisState, controller, tr)),
+                const SizedBox(width: 16),
+                Expanded(child: _buildVoicePanel(controller, tr)),
+              ],
+            ),
+          ),
+        
+        const SizedBox(height: 16),
+        
+        // Bottom Grid: Analysis Chips
+        if (isMobile)
+          Column(
+            children: _buildAnalysisSections(diagnosisState, controller, tr),
+          )
+        else
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: Column(children: _buildAnalysisSections(diagnosisState, controller, tr).sublist(0, 4))),
+              const SizedBox(width: 12),
+              Expanded(child: Column(children: _buildAnalysisSections(diagnosisState, controller, tr).sublist(4))),
+            ],
+          ),
+
+        if (diagnosisState.diagnosisResult == null) ...[
+          const SizedBox(height: 16),
+          _buildActionButtons(diagnosisState, controller, tr),
+        ],
+      ],
+      ),
+    );
+  }
+
+  List<Widget> _buildAnalysisSections(DiagnosisState state, DiagnosisController controller, String Function(String) tr) {
+    return [
+      _buildModularSection(
+        title: tr('irrigation_stage'),
+        icon: Icons.water_drop_outlined,
+        child: _buildIrrigationChips(state, controller, tr),
+      ),
+      const SizedBox(height: 12),
+      _buildModularSection(
+        title: tr('leaf_texture'),
+        icon: Icons.texture_outlined,
+        child: _buildTextureChips(state, controller, tr),
+      ),
+      const SizedBox(height: 12),
+      _buildModularSection(
+        title: tr('soil_moisture'),
+        icon: Icons.waves_outlined,
+        child: _buildSoilChips(state, controller, tr),
+      ),
+      const SizedBox(height: 12),
+      _buildModularSection(
+        title: tr('weather_events'),
+        icon: Icons.cloud_outlined,
+        child: _buildWeatherChips(state, controller, tr),
+      ),
+      const SizedBox(height: 12),
+      _buildModularSection(
+        title: tr('odor_presence'),
+        icon: Icons.air_outlined,
+        child: _buildOdorChips(state, controller, tr),
+      ),
+      const SizedBox(height: 12),
+      _buildModularSection(
+        title: tr('spread_pattern'),
+        icon: Icons.grid_view_outlined,
+        child: _buildSpreadChips(state, controller, tr),
+      ),
+      const SizedBox(height: 12),
+      _buildModularSection(
+        title: tr('speed_of_spread'),
+        icon: Icons.speed_outlined,
+        child: _buildSpeedChipsChallenge(state, controller, tr),
+      ),
+      const SizedBox(height: 12),
+      _buildModularSection(
+        title: tr('intervention_log'),
+        icon: Icons.history_edu_outlined,
+        child: _buildInterventionChips(state, controller, tr),
+      ),
+    ];
+  }
+
+  Widget _buildVideoImageInput(DiagnosisState diagnosisState, DiagnosisController controller, String Function(String) tr) {
+    return Column(
+      children: [
+        if (diagnosisState.imageFile == null)
+          Padding(
+            padding: const EdgeInsets.only(top: 16, bottom: 8),
+            child: Text(
+              tr('take_photo_instruction'),
+              style: const TextStyle(
+                fontSize: 14,
+                color: ColorPalette.textSecondary,
+                fontWeight: FontWeight.w500,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        Expanded(
+          child: diagnosisState.imageFile == null
+              ? _buildPicker(context, controller, tr)
+              : _buildPreview(context, controller, diagnosisState, tr),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRightPanel(DiagnosisState diagnosisState, DiagnosisController controller, String Function(String) tr, {bool isMobile = false, required BuildContext context}) {
+    final panelContent = Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: diagnosisState.isAnalyzing
+        ? _buildAnalyzingPlaceholder(tr)
+        : diagnosisState.diagnosisResult == null
+        ? _buildResultPlaceholder(tr)
+        : Column(
+            children: [
+              _buildTreatmentSummaryCard(context, ref, diagnosisState.diagnosisResult!, tr),
+              const SizedBox(height: 16),
+              if (isMobile)
+                RecursiveInsightThread(thread: diagnosisState.conversationThread, physics: const NeverScrollableScrollPhysics(), shrinkWrap: true)
+              else
+                Expanded(
+                  child: RecursiveInsightThread(thread: diagnosisState.conversationThread),
+                ),
+            ],
+          ),
+    );
+
+    if (isMobile) {
+      return panelContent;
+    }
+
+    return panelContent;
   }
 
   /// Builds the top-level voice and language panel
@@ -350,9 +380,12 @@ class _CropDoctorScreenState extends ConsumerState<CropDoctorScreen> {
             children: [
               const Icon(Icons.record_voice_over_outlined, color: ColorPalette.emeraldGreen, size: 18),
               const SizedBox(width: 12),
-              Text(
-                tr('describe_issue_hint').split('(').first.trim(), 
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              Flexible(
+                child: Text(
+                  tr('describe_issue_hint').split('(').first.trim(), 
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
               const Spacer(),
               GestureDetector(
@@ -400,46 +433,47 @@ class _CropDoctorScreenState extends ConsumerState<CropDoctorScreen> {
     
     return Column(
       children: [
-        SizedBox(
-          width: double.infinity,
-          height: 48,
-          child: ElevatedButton.icon(
-            onPressed: (state.imageFile == null || state.isAnalyzing) ? null : () async {
-              if (isInitial) {
-                await controller.analyzeImage();
-              } else {
-                // Second Opinion / Refine
-                final overrides = {
-                  'leaf_texture': state.leafTexture,
-                  'odor_presence': state.odorPresence,
-                  'speed_of_spread': state.speedOfSpread,
-                };
-                await controller.refineDiagnosis(state.description ?? "", overrides);
-              }
+        if (state.imageFile != null || !isInitial)
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton.icon(
+              onPressed: state.isAnalyzing ? null : () async {
+                if (isInitial) {
+                  await controller.analyzeImage();
+                } else {
+                  // Second Opinion / Refine
+                  final overrides = {
+                    'leaf_texture': state.leafTexture,
+                    'odor_presence': state.odorPresence,
+                    'speed_of_spread': state.speedOfSpread,
+                  };
+                  await controller.refineDiagnosis(state.description ?? "", overrides);
+                }
 
-              // Clear input on success
-              if (ref.read(diagnosisProvider).errorMessage == null) {
-                _textController.clear();
-                controller.setDescription('');
-              }
-            },
-            icon: state.isAnalyzing
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                : Icon(isInitial ? Icons.analytics_outlined : Icons.auto_awesome_outlined),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: ColorPalette.emeraldGreen,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              elevation: 0,
-            ),
-            label: Text(
-              state.isAnalyzing 
-                ? (isInitial ? tr('analyzing') : tr('refining'))
-                : (isInitial ? tr('analyze_crop') : tr('ask_second_opinion')), 
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)
+                // Clear input on success
+                if (ref.read(diagnosisProvider).errorMessage == null) {
+                  _textController.clear();
+                  controller.setDescription('');
+                }
+              },
+              icon: state.isAnalyzing
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : Icon(isInitial ? Icons.analytics_outlined : Icons.auto_awesome_outlined),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ColorPalette.emeraldGreen,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                elevation: 0,
+              ),
+              label: Text(
+                state.isAnalyzing 
+                  ? (isInitial ? tr('analyzing') : tr('refining'))
+                  : (isInitial ? tr('analyze_crop') : tr('ask_second_opinion')), 
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)
+              ),
             ),
           ),
-        ),
       ],
     );
   }
@@ -466,24 +500,37 @@ class _CropDoctorScreenState extends ConsumerState<CropDoctorScreen> {
             ),
         ),
         
+        const SizedBox(height: 4),
+        Text(
+          tr('supports_formats'),
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey.shade500,
+          ),
+        ),
+        
         const SizedBox(height: 24),
 
         // Action Buttons
         Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-                _buildOptionButton(
-                    context, 
-                    icon: Icons.camera_alt_rounded, 
-                    label: tr('camera'),
-                    onTap: () => controller.pickImage(ImageSource.camera),
+                Expanded(
+                  child: _buildOptionButton(
+                      context, 
+                      icon: Icons.camera_alt_rounded, 
+                      label: tr('camera'),
+                      onTap: () => controller.pickImage(ImageSource.camera),
+                  ),
                 ),
                 const SizedBox(width: 16),
-                _buildOptionButton(
-                    context, 
-                    icon: Icons.photo_library_rounded, 
-                    label: tr('gallery'),
-                    onTap: () => controller.pickImage(ImageSource.gallery),
+                Expanded(
+                  child: _buildOptionButton(
+                      context, 
+                      icon: Icons.photo_library_rounded, 
+                      label: tr('gallery'),
+                      onTap: () => controller.pickImage(ImageSource.gallery),
+                  ),
                 ),
             ],
         ),
@@ -608,7 +655,7 @@ class _CropDoctorScreenState extends ConsumerState<CropDoctorScreen> {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         // Pulsing AI Icon
-        Icon(
+        const Icon(
           Icons.auto_awesome,
           size: 80,
           color: ColorPalette.emeraldGreen,
@@ -743,13 +790,16 @@ class _CropDoctorScreenState extends ConsumerState<CropDoctorScreen> {
             children: [
               Icon(icon, size: 14, color: ColorPalette.emeraldGreen),
               const SizedBox(width: 8),
-              Text(
-                title.toUpperCase(),
-                style: const TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  color: ColorPalette.textSecondary,
-                  letterSpacing: 1.1,
+              Expanded(
+                child: Text(
+                  title.toUpperCase(),
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: ColorPalette.textSecondary,
+                    letterSpacing: 1.1,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
