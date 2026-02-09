@@ -11,6 +11,8 @@ import '../../../../core/api/path_enforcer.dart';
 import '../../../../core/services/local_vault.dart';
 import '../../../auth/providers/auth_provider.dart';
 import 'package:flutter_app/core/localization/language_provider.dart';
+import 'package:flutter_app/features/crop_diagnosis/providers/diagnosis_provider.dart';
+import 'package:flutter_app/features/yield_prediction/providers/yield_provider.dart';
 
 /// RecentActivityList - Displays a consolidated list of recent actions (Diagnoses & Yield Predictions)
 class RecentActivityList extends ConsumerWidget {
@@ -49,22 +51,28 @@ class RecentActivityList extends ConsumerWidget {
           ],
         ),
         const SizedBox(height: 8),
-        activityAsync.when(
-          data: (history) {
-            if (history.isEmpty) {
-              return _buildEmptyState(tr);
-            }
-            return Column(
-              children: history.map((record) => _buildActivityItem(context, ref, tr, record)).toList(),
-            );
-          },
-          loading: () => const Center(
-            child: Padding(
-              padding: EdgeInsets.all(24.0),
-              child: CircularProgressIndicator(),
+        Expanded(
+          child: activityAsync.when(
+            data: (history) {
+              if (history.isEmpty) {
+                return _buildEmptyState(tr);
+              }
+              return ListView.builder(
+                padding: EdgeInsets.zero,
+                itemCount: history.length,
+                itemBuilder: (context, index) {
+                  return _buildActivityItem(context, ref, tr, history[index]);
+                },
+              );
+            },
+            loading: () => const Center(
+              child: Padding(
+                padding: EdgeInsets.all(24.0),
+                child: CircularProgressIndicator(),
+              ),
             ),
+            error: (err, stack) => Center(child: Text("${tr.translate('error_loading_activity')}: $err")),
           ),
-          error: (err, stack) => Center(child: Text("${tr.translate('error_loading_activity')}: $err")),
         ),
       ],
     );
@@ -181,16 +189,40 @@ class RecentActivityList extends ConsumerWidget {
                         ],
                       ),
                       const SizedBox(height: 2),
-                      Text(
-                        // Translate crop names for yield prediction, keep disease names as-is (from AI)
-                        isDiagnosis ? record.title : (record.title.contains(' - ') ? record.title : tr.translate(record.title)),
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                          color: isDiagnosis 
-                            ? (isHealthy ? ColorPalette.emeraldGreen : ColorPalette.rustRed)
-                            : ColorPalette.textPrimary,
-                        ),
+                      Builder(
+                        builder: (context) {
+                          final diagnosisState = ref.watch(diagnosisProvider);
+                          final yieldState = ref.watch(yieldProvider);
+                          
+                          String displayTitle = record.title;
+                          if (isDiagnosis) {
+                            if (diagnosisState.activeRecordId == record.id && diagnosisState.diagnosisResult != null) {
+                              displayTitle = diagnosisState.diagnosisResult!['disease_name'] ?? record.title;
+                            } else if (!record.title.contains(' ')) {
+                              displayTitle = tr.translate(record.title);
+                            }
+                          } else {
+                            if (yieldState.activeRecordId == record.id && yieldState.result != null) {
+                              final localizedCrop = tr.translate((record.cropName ?? 'onion').toLowerCase());
+                              final yieldVal = yieldState.result!.expectedYield.toStringAsFixed(1);
+                              final qtlAcre = tr.translate('qtl_acre');
+                              displayTitle = '$yieldVal $qtlAcre - $localizedCrop';
+                            } else if (!record.title.contains(' - ')) {
+                              displayTitle = tr.translate(record.title);
+                            }
+                          }
+
+                          return Text(
+                            displayTitle,
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                              color: isDiagnosis 
+                                ? (isHealthy ? ColorPalette.emeraldGreen : ColorPalette.rustRed)
+                                : ColorPalette.textPrimary,
+                            ),
+                          );
+                        }
                       ),
                       const SizedBox(height: 4),
                       if (!isDiagnosis)
@@ -272,7 +304,7 @@ class RecentActivityList extends ConsumerWidget {
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
-        isYield ? tr.translate('yield_prediction') : "${(record.confidence * 100).toInt()}% CONF",
+        isYield ? tr.translate('yield_prediction') : "${(record.confidence * 100).toInt()}% ${tr.translate('confidence_suffix')}",
         style: TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.bold,

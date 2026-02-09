@@ -166,6 +166,24 @@ class LoginController extends StateNotifier<LoginState> {
     }
   }
   
+  /// Skips login for demo purposes
+  Future<void> skipLogin() async {
+    state = state.copyWith(status: LoginStatus.authenticating, errorMessage: null);
+
+    try {
+      final user = await _repository.skipLogin();
+      
+      await _authStateNotifier.login(user);
+      
+      state = state.copyWith(status: LoginStatus.authenticated);
+    } catch (e) {
+      state = state.copyWith(
+        status: LoginStatus.error,
+        errorMessage: e.toString(),
+      );
+    }
+  }
+  
   void reset() {
     state = const LoginState();
   }

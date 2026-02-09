@@ -118,6 +118,16 @@ class ProfileController extends StateNotifier<ProfileState> {
     );
   }
 
+  /// Add a pre-configured demo field for quick testing
+  Future<void> addDemoField(String demoPlotName) async {
+    await addField(
+      name: demoPlotName,
+      soilType: 'Red Loamy Soil',
+      acreage: 2.5,
+      irrigationType: 'Drip',
+    );
+  }
+
   Future<void> removeField(String fieldId) async {
     // 1. Filter out the field
     final updatedFields = state.fields.where((f) => f.id != fieldId).toList();

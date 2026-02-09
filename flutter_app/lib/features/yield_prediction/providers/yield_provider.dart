@@ -22,6 +22,7 @@ class YieldState {
   final String? soilType;
   final DateTime? plantedDate;
   final DateTime? expectedHarvestDate;
+  final String? activeRecordId;
 
   const YieldState({
     this.isLoading = false,
@@ -33,6 +34,7 @@ class YieldState {
     this.soilType,
     this.plantedDate,
     this.expectedHarvestDate,
+    this.activeRecordId,
   });
 
   YieldState copyWith({
@@ -45,6 +47,7 @@ class YieldState {
     String? soilType,
     DateTime? plantedDate,
     DateTime? expectedHarvestDate,
+    String? activeRecordId,
   }) {
     return YieldState(
       isLoading: isLoading ?? this.isLoading,
@@ -56,6 +59,7 @@ class YieldState {
       soilType: soilType ?? this.soilType,
       plantedDate: plantedDate ?? this.plantedDate,
       expectedHarvestDate: expectedHarvestDate ?? this.expectedHarvestDate,
+      activeRecordId: activeRecordId ?? this.activeRecordId,
     );
   }
 }
@@ -72,10 +76,19 @@ class YieldController extends StateNotifier<YieldState> {
   void updateSoilType(String value) => state = state.copyWith(soilType: value);
   void updatePlantedDate(DateTime value) => state = state.copyWith(plantedDate: value);
   void updateExpectedHarvestDate(DateTime value) => state = state.copyWith(expectedHarvestDate: value);
+  
+  void loadRecord(YieldRecord record) {
+    state = state.copyWith(
+      activeRecordId: record.id,
+      cropName: record.cropName,
+      result: YieldPrediction.fromJson(record.id, record.rawAiResponse),
+    );
+  }
 
   Future<void> predictYield() async {
     if (state.cropName == null || state.fieldArea == null || state.soilType == null) {
-      state = state.copyWith(errorMessage: "Please select all field parameters before running prediction.");
+      final tr = _ref.read(languageProvider.notifier);
+      state = state.copyWith(errorMessage: tr.translate('select_params_warning'));
       return;
     }
 
@@ -140,51 +153,135 @@ class YieldController extends StateNotifier<YieldState> {
           _ref.invalidate(yieldHistoryProvider);
         }
 
-        state = state.copyWith(isLoading: false, result: prediction);
+        state = state.copyWith(isLoading: false, result: prediction, activeRecordId: prediction.id);
       } else {
         throw Exception(response['error'] ?? "Unknown error from AI");
       }
     } catch (e) {
       debugPrint("Yield Error: $e");
+      final tr = _ref.read(languageProvider.notifier);
       state = state.copyWith(
         isLoading: false, 
-        errorMessage: "Yield prediction failed: ${e.toString()}"
+        errorMessage: "${tr.translate('yield_prediction_failed')}: ${e.toString()}"
       );
     }
   }
 
-  Future<void> translateResult(String languageName) async {
-    if (state.result == null) return;
+  Future<void> translateResult(String languageName, {String? recordId}) async {
+    if (state.result == null && recordId == null) return;
     
-    state = state.copyWith(isLoading: true);
+    state = state.copyWith(isLoading: true, activeRecordId: recordId ?? state.activeRecordId);
 
     try {
       final currentResult = state.result!;
       
-      // Combine text to translate into one block to save API calls
-      // Format: "Factors: ... | Recommendations: ..."
-      final factorsText = currentResult.primaryFactors.join(" || ");
-      final recsText = currentResult.recommendations.join(" || ");
-      
-      final fullTextToTranslate = "FACTORS_START\n$factorsText\nFACTORS_END\nRECOMMENDATIONS_START\n$recsText\nRECOMMENDATIONS_END";
+      // Combine text to translate into one block
+      final factorsText = currentResult.primaryFactors.join("\n- ");
+      final recsText = currentResult.recommendations.join("\n- ");
+      final insightsText = currentResult.contextualInsights.map((e) => "${e.label}: ${e.value} (${e.status})").join("\n");
+      final forecastText = currentResult.dailyForecast.map((e) => "${e.day}: ${e.condition}").join("\n");
+
+      final fullTextToTranslate = """
+      INSTRUCTION: Translate the following agricultural data into $languageName. 
+      IMPORTANT: DO NOT translate or modify any text inside double brackets like [[TAG_NAME]]. Keep them exactly as they are.
+
+      [[YIELD_FACTORS]]
+      $factorsText
+
+      [[YIELD_STRATEGY]]
+      $recsText
+
+      [[YIELD_INSIGHTS]]
+      $insightsText
+
+      [[YIELD_FORECAST]]
+      $forecastText
+      """;
       
       final translatedBlock = await _apiService.translateText(fullTextToTranslate, languageName);
+      final String translatedStr = translatedBlock.toString();
       
-      // Parse back
-      final factorsMatch = RegExp(r'FACTORS_START\n(.*?)\nFACTORS_END', dotAll: true).firstMatch(translatedBlock);
-      final recsMatch = RegExp(r'RECOMMENDATIONS_START\n(.*?)\nRECOMMENDATIONS_END', dotAll: true).firstMatch(translatedBlock);
+      List<String> parseList(String tag) {
+        final lines = translatedStr.split("\n");
+        int startIndex = lines.indexWhere((l) => l.contains(tag));
+        if (startIndex == -1) return [];
+        
+        final result = <String>[];
+        for (int i = startIndex + 1; i < lines.length; i++) {
+          final line = lines[i].trim();
+          if (line.isEmpty) continue;
+          if (line.startsWith("[[") && line.endsWith("]]")) break; 
+          
+          // Remove common bullet prefixes
+          String clean = line.replaceFirst(RegExp(r'^[\-\*\•\d\.\)]+\s*'), '').trim();
+          if (clean.isNotEmpty) result.add(clean);
+        }
+        return result;
+      }
       
-      final newFactors = factorsMatch?.group(1)?.split(" || ").map((e) => e.trim()).toList() ?? currentResult.primaryFactors;
-      final newRecs = recsMatch?.group(1)?.split(" || ").map((e) => e.trim()).toList() ?? currentResult.recommendations;
+      final newFactors = parseList("[[YIELD_FACTORS]]");
+      final newRecs = parseList("[[YIELD_STRATEGY]]");
+      final insightLines = parseList("[[YIELD_INSIGHTS]]");
+      final forecastLines = parseList("[[YIELD_FORECAST]]");
       
+      // Map insights back
+      final List<InsightCard> newInsights = [];
+      for (int i = 0; i < currentResult.contextualInsights.length; i++) {
+        final original = currentResult.contextualInsights[i];
+        String newValue = original.value;
+        String newStatus = original.status;
+        
+        for (final line in insightLines) {
+          if (line.contains(original.label) || line.toLowerCase().contains(original.label.toLowerCase())) {
+            final match = RegExp(r':\s*(.*?)\s*\((.*?)\)').firstMatch(line);
+            if (match != null) {
+              newValue = match.group(1)?.trim() ?? newValue;
+              newStatus = match.group(2)?.trim() ?? newStatus;
+            } else if (line.contains(":")) {
+               newValue = line.split(":").last.trim();
+            }
+            break;
+          }
+        }
+        newInsights.add(InsightCard(
+          label: original.label,
+          value: newValue,
+          status: newStatus,
+          iconType: original.iconType,
+        ));
+      }
+
+      // Map forecast back
+      final List<DailyForecast> newForecast = [];
+      for (int i = 0; i < currentResult.dailyForecast.length; i++) {
+        final original = currentResult.dailyForecast[i];
+        String newDay = original.day;
+        String newCondition = original.condition;
+        
+        if (i < forecastLines.length) {
+          final line = forecastLines[i];
+          if (line.contains(":")) {
+            final parts = line.split(":");
+            newDay = parts[0].trim();
+            newCondition = parts.last.trim();
+          }
+        }
+        newForecast.add(DailyForecast(
+          day: newDay,
+          temp: original.temp,
+          condition: newCondition,
+          yieldPotential: original.yieldPotential,
+        ));
+      }
+
       final newResult = YieldPrediction(
         id: currentResult.id,
         expectedYield: currentResult.expectedYield,
         confidence: currentResult.confidence,
-        primaryFactors: newFactors,
-        recommendations: newRecs,
-        contextualInsights: currentResult.contextualInsights,
-        dailyForecast: currentResult.dailyForecast,
+        primaryFactors: newFactors.isNotEmpty ? newFactors : currentResult.primaryFactors,
+        recommendations: newRecs.isNotEmpty ? newRecs : currentResult.recommendations,
+        contextualInsights: newInsights.isNotEmpty ? newInsights : currentResult.contextualInsights,
+        dailyForecast: newForecast.isNotEmpty ? newForecast : currentResult.dailyForecast,
         predictionDate: currentResult.predictionDate,
         rawAiResponse: currentResult.rawAiResponse,
       );
@@ -192,7 +289,6 @@ class YieldController extends StateNotifier<YieldState> {
       state = state.copyWith(isLoading: false, result: newResult);
     } catch (e) {
       debugPrint("Translation Error: $e");
-      // Don't fail the whole state, just stop loading
       state = state.copyWith(isLoading: false);
     }
   }

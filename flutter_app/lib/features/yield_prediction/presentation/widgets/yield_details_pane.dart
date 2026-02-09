@@ -6,6 +6,7 @@ import 'package:flutter_app/features/yield_prediction/models/yield_record.dart';
 import 'package:flutter_app/features/yield_prediction/presentation/widgets/yield_result_view.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_app/core/localization/language_provider.dart';
+import 'package:flutter_app/features/yield_prediction/providers/yield_provider.dart';
 
 class YieldDetailsPane extends ConsumerWidget {
   final YieldRecord record;
@@ -40,7 +41,17 @@ class YieldDetailsPane extends ConsumerWidget {
       );
     }
 
-    final prediction = YieldPrediction.fromJson(record.id, record.rawAiResponse);
+    final yieldState = ref.watch(yieldProvider);
+    final bool isCorrectRecord = yieldState.activeRecordId == record.id;
+    
+    // Prefer state if available for this specific record (translation support)
+    final YieldPrediction prediction = (isCorrectRecord && yieldState.result != null)
+        ? yieldState.result!
+        : YieldPrediction.fromJson(record.id, record.rawAiResponse);
+
+    if (yieldState.isLoading && isCorrectRecord) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
     return Column(
       children: [

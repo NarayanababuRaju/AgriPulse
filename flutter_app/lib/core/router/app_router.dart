@@ -100,31 +100,25 @@ class RouterNotifier extends ChangeNotifier {
     final bool hasFields = profileState.fields.isNotEmpty;
     
     final bool atLogin = state.matchedLocation == AppRouter.loginPath;
-    final bool atOnboarding = state.matchedLocation == AppRouter.onboardingPath;
+    final bool atFieldRegistration = state.matchedLocation == AppRouter.fieldRegistrationPath;
 
     // 🛡️ 2. Auth Guard: Redirect to Login if not authenticated
     if (!loggedIn) {
       return atLogin ? null : AppRouter.loginPath;
     }
 
-    // 🛡️ 3. Login Redirect: If logged in and explicitly AT LOGIN, go to data
+    // 🛡️ 3. Login Redirect: If logged in and explicitly AT LOGIN, go to appropriate screen
     if (atLogin && loggedIn) {
-      return hasFields ? AppRouter.dashboardPath : AppRouter.onboardingPath;
+      return hasFields ? AppRouter.dashboardPath : AppRouter.fieldRegistrationPath;
     }
 
-    // �️ 4. Onboarding Guard: If logged in but no fields, must onboard
-    if (!hasFields && !atOnboarding) {
-      return AppRouter.onboardingPath;
-    }
-    
-    // �️ 5. Onboarding Exit: If has fields and at onboarding, go to Dashboard
-    if (hasFields && atOnboarding) {
-       return AppRouter.dashboardPath;
+    // 🛡️ 4. Onboarding Guard: If logged in but no fields, must register first plot
+    if (!hasFields && !atFieldRegistration) {
+      return AppRouter.fieldRegistrationPath;
     }
 
-    // 🚀 6. Deep Link / Internal Page: Allow access
-    // If we reached here, we are logged in, have fields, and are NOT at Login/Onboarding.
-    // e.g. /activity-log, /crop-doctor
+    // 🚀 5. Allow Access: Users can freely navigate to field registration to add plots
+    // No need to redirect them away - the screen handles both first-time and returning users
 
     return null;
   }

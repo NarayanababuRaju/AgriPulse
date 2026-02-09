@@ -17,4 +17,7 @@ abstract class AuthRepository {
 
   /// Gets the current user if already logged in.
   Future<Farmer?> getCurrentUser();
+
+  /// Skips login for demo purposes.
+  Future<Farmer> skipLogin();
 }

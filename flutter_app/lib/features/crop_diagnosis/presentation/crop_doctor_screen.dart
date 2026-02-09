@@ -307,7 +307,9 @@ class _CropDoctorScreenState extends ConsumerState<CropDoctorScreen> {
                     ),
                   ],
                 ),
-                child: diagnosisState.diagnosisResult == null
+                child: diagnosisState.isAnalyzing
+                  ? _buildAnalyzingPlaceholder(tr)
+                  : diagnosisState.diagnosisResult == null
                   ? _buildResultPlaceholder(tr)
                   : Column(
                       children: [
@@ -402,9 +404,9 @@ class _CropDoctorScreenState extends ConsumerState<CropDoctorScreen> {
           width: double.infinity,
           height: 48,
           child: ElevatedButton.icon(
-            onPressed: (state.imageFile == null || state.isAnalyzing) ? null : () {
+            onPressed: (state.imageFile == null || state.isAnalyzing) ? null : () async {
               if (isInitial) {
-                controller.analyzeImage();
+                await controller.analyzeImage();
               } else {
                 // Second Opinion / Refine
                 final overrides = {
@@ -412,7 +414,13 @@ class _CropDoctorScreenState extends ConsumerState<CropDoctorScreen> {
                   'odor_presence': state.odorPresence,
                   'speed_of_spread': state.speedOfSpread,
                 };
-                controller.refineDiagnosis(state.description ?? "", overrides);
+                await controller.refineDiagnosis(state.description ?? "", overrides);
+              }
+
+              // Clear input on success
+              if (ref.read(diagnosisProvider).errorMessage == null) {
+                _textController.clear();
+                controller.setDescription('');
               }
             },
             icon: state.isAnalyzing
@@ -589,6 +597,41 @@ class _CropDoctorScreenState extends ConsumerState<CropDoctorScreen> {
           tr('diagnosis_placeholder'),
           textAlign: TextAlign.center,
           style: TextStyle(color: Colors.grey.shade400),
+        ),
+      ],
+    );
+  }
+
+  /// Builds the loading placeholder during analysis
+  Widget _buildAnalyzingPlaceholder(String Function(String) tr) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        // Pulsing AI Icon
+        Icon(
+          Icons.auto_awesome,
+          size: 80,
+          color: ColorPalette.emeraldGreen,
+        ).animate(onPlay: (controller) => controller.repeat(reverse: true))
+         .scale(begin: const Offset(1, 1), end: const Offset(1.2, 1.2), duration: 1000.ms)
+         .then()
+         .shimmer(duration: 1200.ms, color: Colors.white.withValues(alpha: 0.5)),
+        
+        const SizedBox(height: 24),
+        
+        Text(
+          tr('analyzing'), // e.g. "Gemini analyzing..."
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: ColorPalette.emeraldGreen,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          tr('identifying_diseases'), // e.g. "Identifying diseases and pests..."
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.grey.shade600),
         ),
       ],
     );

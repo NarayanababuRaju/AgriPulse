@@ -50,13 +50,34 @@ class _ActivityHistoryScreenState extends ConsumerState<ActivityHistoryScreen> {
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
           onPressed: () => context.pop(),
         ),
-        actions: const [
+        actions: [
           Center(
             child: LanguageSelector(
               textColor: ColorPalette.textPrimary,
+              onChanged: (lang) {
+                if (_selectedRecord == null) return;
+                
+                if (_selectedRecord!.type == ActivityType.diagnosis) {
+                  final controller = ref.read(diagnosisProvider.notifier);
+                  final record = _selectedRecord!.originalRecord;
+                  
+                  if (ref.read(diagnosisProvider).activeRecordId != record.id) {
+                    controller.loadRecord(record);
+                  }
+                  controller.translateDiagnosis(lang.backendName);
+                } else {
+                  final controller = ref.read(yieldProvider.notifier);
+                  final record = _selectedRecord!.originalRecord;
+                  
+                  if (ref.read(yieldProvider).activeRecordId != record.id) {
+                    controller.loadRecord(record);
+                  }
+                  controller.translateResult(lang.backendName);
+                }
+              },
             ),
           ),
-          SizedBox(width: 16),
+          const SizedBox(width: 16),
         ],
       ),
       body: activityAsync.when(
@@ -225,13 +246,38 @@ class _ActivityHistoryScreenState extends ConsumerState<ActivityHistoryScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      record.title.contains(' - ') ? record.title : tr.translate(record.title),
-                      style: GoogleFonts.outfit(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                        color: isSelected ? ColorPalette.emeraldGreen : ColorPalette.textPrimary,
-                      ),
+                    Builder(
+                      builder: (context) {
+                        final diagnosisState = ref.watch(diagnosisProvider);
+                        final yieldState = ref.watch(yieldProvider);
+                        
+                        String displayTitle = record.title;
+                        if (isDiagnosis) {
+                          if (diagnosisState.activeRecordId == record.id && diagnosisState.diagnosisResult != null) {
+                            displayTitle = diagnosisState.diagnosisResult!['disease_name'] ?? record.title;
+                          } else if (!record.title.contains(' ')) {
+                            displayTitle = tr.translate(record.title);
+                          }
+                        } else {
+                          if (yieldState.activeRecordId == record.id && yieldState.result != null) {
+                            final localizedCrop = tr.translate((record.cropName ?? 'onion').toLowerCase());
+                            final yieldVal = yieldState.result!.expectedYield.toStringAsFixed(1);
+                            final qtlAcre = tr.translate('qtl_acre');
+                            displayTitle = '$yieldVal $qtlAcre - $localizedCrop';
+                          } else if (!record.title.contains(' - ')) {
+                            displayTitle = tr.translate(record.title);
+                          }
+                        }
+
+                        return Text(
+                          displayTitle,
+                          style: GoogleFonts.outfit(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                            color: isSelected ? ColorPalette.emeraldGreen : ColorPalette.textPrimary,
+                          ),
+                        );
+                      }
                     ),
                     Text(
                       !isDiagnosis && !record.subtitle.contains(' • ') 

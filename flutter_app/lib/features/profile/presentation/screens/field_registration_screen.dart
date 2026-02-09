@@ -8,6 +8,7 @@ import '../../domain/entities/soil_type.dart';
 import '../../domain/entities/plot_name_option.dart';
 import '../../domain/entities/acreage_range_option.dart';
 import 'package:flutter_app/core/localization/language_provider.dart';
+import 'package:flutter_app/core/router/app_router.dart';
 
 class FieldRegistrationScreen extends ConsumerStatefulWidget {
   const FieldRegistrationScreen({super.key});
@@ -47,6 +48,8 @@ class _FieldRegistrationScreenState extends ConsumerState<FieldRegistrationScree
       final plotNameOption = PlotNameOption.defaults.firstWhere((p) => p.id == _selectedPlotNameId);
       final acreageOption = AcreageRangeOption.defaults.firstWhere((a) => a.id == _selectedAcreageId);
       final tr = ref.read(languageProvider.notifier);
+      final profileState = ref.read(profileProvider);
+      final isFirstTime = profileState.fields.isEmpty;
       
       // Determine plot name
       String plotName;
@@ -70,24 +73,46 @@ class _FieldRegistrationScreenState extends ConsumerState<FieldRegistrationScree
         acreage: acreageValue,
         irrigationType: tr.translate(_selectedIrrigationKey),
       );
-      if (mounted) context.pop(); // Returns to Dashboard
+      
+      if (mounted) {
+        if (isFirstTime) {
+          context.go(AppRouter.dashboardPath);
+        } else {
+          context.pop();
+        }
+      }
+    }
+  }
+
+  Future<void> _skipWithDemo() async {
+    final tr = ref.read(languageProvider.notifier);
+    await ref.read(profileProvider.notifier).addDemoField(
+      tr.translate('demo_plot_name'),
+    );
+    if (mounted) {
+      context.go(AppRouter.dashboardPath);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final tr = ref.watch(languageProvider.notifier);
+    final profileState = ref.watch(profileProvider);
+    final isFirstTime = profileState.fields.isEmpty;
     
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
         title: Text(
-          tr.translate('register_new_plot'),
+          isFirstTime 
+            ? tr.translate('welcome_setup_first_plot')
+            : tr.translate('register_new_plot'),
           style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.white,
         foregroundColor: ColorPalette.textPrimary,
         elevation: 0,
+        automaticallyImplyLeading: !isFirstTime,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -96,6 +121,60 @@ class _FieldRegistrationScreenState extends ConsumerState<FieldRegistrationScree
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Welcome Banner (First-time users only)
+              if (isFirstTime) ...[
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        ColorPalette.emeraldGreen.withValues(alpha: 0.1),
+                        ColorPalette.emeraldGreen.withValues(alpha: 0.05),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: ColorPalette.emeraldGreen.withValues(alpha: 0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.agriculture_rounded,
+                        size: 48,
+                        color: ColorPalette.emeraldGreen,
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              tr.translate('welcome_agripulse'),
+                              style: GoogleFonts.outfit(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: ColorPalette.emeraldGreen,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              tr.translate('unlock_ai_insights'),
+                              style: GoogleFonts.outfit(
+                                fontSize: 13,
+                                color: ColorPalette.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 32),
+              ],
+              
               Text(
                 tr.translate('plot_info'),
                 style: GoogleFonts.outfit(
@@ -384,7 +463,9 @@ class _FieldRegistrationScreenState extends ConsumerState<FieldRegistrationScree
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
                   child: Text(
-                    tr.translate('submit_registration'),
+                    isFirstTime 
+                      ? tr.translate('get_started')
+                      : tr.translate('submit_registration'),
                     style: GoogleFonts.outfit(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -392,6 +473,30 @@ class _FieldRegistrationScreenState extends ConsumerState<FieldRegistrationScree
                   ),
                 ),
               ),
+              
+              // Demo Mode Button (First-time users only)
+              if (isFirstTime) ...[
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: _skipWithDemo,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: ColorPalette.textSecondary,
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      side: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    child: Text(
+                      tr.translate('skip_demo'),
+                      style: GoogleFonts.outfit(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),

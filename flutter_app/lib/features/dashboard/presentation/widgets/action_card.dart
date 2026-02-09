@@ -11,6 +11,7 @@ class ActionCard extends StatefulWidget {
   final Color color;
   final VoidCallback onTap;
   final bool isPrimary; // New: If true, use a bold primary variant
+  final bool isComingSoon; // New: If true, show as disabled with a badge
 
   const ActionCard({
     super.key,
@@ -20,6 +21,7 @@ class ActionCard extends StatefulWidget {
     required this.color,
     required this.onTap,
     this.isPrimary = false,
+    this.isComingSoon = false,
   });
 
   @override
@@ -71,11 +73,11 @@ class _ActionCardState extends State<ActionCard> with SingleTickerProviderStateM
       onEnter: (_) => _onHoverChange(true),
       onExit: (_) => _onHoverChange(false),
       child: InkWell(
-        onTap: widget.onTap,
+        onTap: widget.isComingSoon ? null : widget.onTap,
         borderRadius: BorderRadius.circular(16),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
@@ -94,60 +96,74 @@ class _ActionCardState extends State<ActionCard> with SingleTickerProviderStateM
             ],
           ),
           child: Stack(
+            alignment: Alignment.center,
             children: [
               Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   // Icon Circle
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: widget.color.withValues(alpha: _isHovered ? 0.15 : 0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      widget.icon,
-                      color: widget.color,
-                      size: 28,
+                  Opacity(
+                    opacity: widget.isComingSoon ? 0.6 : 1.0,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: widget.color.withValues(alpha: _isHovered ? 0.15 : 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        widget.icon,
+                        color: widget.color,
+                        size: 24,
+                      ),
                     ),
                   ),
 
                   const SizedBox(height: 12),
 
                   // Title
-                  Text(
-                    widget.title,
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: ColorPalette.textPrimary,
+                  Opacity(
+                    opacity: widget.isComingSoon ? 0.6 : 1.0,
+                    child: Text(
+                      widget.title,
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: ColorPalette.textPrimary,
+                      ),
                     ),
                   ),
                   
                   // Subtitle (Feature Description)
                   if (widget.subtitle != null) ...[
                     const SizedBox(height: 4),
-                    Text(
-                      widget.subtitle!,
-                      textAlign: TextAlign.center,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: ColorPalette.textSecondary.withValues(alpha: 0.8),
-                        height: 1.3,
+                    Opacity(
+                      opacity: widget.isComingSoon ? 0.4 : 1.0,
+                      child: Text(
+                        widget.subtitle!,
+                        textAlign: TextAlign.center,
+                        maxLines: 2, // Slightly reduced for grid view consistency
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: ColorPalette.textSecondary.withValues(alpha: 0.8),
+                          height: 1.2,
+                        ),
                       ),
                     ),
                   ],
                 ],
               ),
               
+              // Soon Badge Removed per request
+              // if (widget.isComingSoon) ...
+
               // Animated Arrow Indicator (bottom center)
-              Positioned(
+              if (!widget.isComingSoon)
+                Positioned(
                 bottom: 0,
                 left: 0,
                 right: 0,
