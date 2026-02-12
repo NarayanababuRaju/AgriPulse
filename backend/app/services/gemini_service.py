@@ -24,7 +24,7 @@ class GeminiService:
         logger.info("Gemini service initialized with both 1.5 and 3.0 model families.")
 
     # =========================================================================
-    # VERSION 3.0: CROP ANALYSIS (Updated for Hackathon Requirements)
+    # VERSION 1.5: CROP ANALYSIS (Current default for stability)
     # =========================================================================
     async def analyze_crop_disease(
         self,
@@ -35,7 +35,7 @@ class GeminiService:
         weather_context: Optional[Dict[str, Any]] = None,
         language: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Analyze crop disease using Gemini 3.0 Flash (Multimodal + JSON Mode)"""
+        """Analyze crop disease using Gemini 1.5 Flash (Multimodal + JSON Mode)"""
         try:
             prompt = f"""You are an expert agricultural advisor for Indian farmers. 
 Analyze the crop image and the farmer's description to provide a precise diagnosis.
@@ -48,19 +48,17 @@ PLOT METADATA:
 """
             if language:
                 logger.debug(f"Generating crop diagnosis in language: {language}")
-                prompt += f"\nLANGUAGE INSTRUCTIONS:\nThe farmer's preferred language is {language}. You MUST provide the content of all text fields in {language}.\n"
+                prompt += f"\nLANGUAGE INSTRUCTIONS:\nThe farmer's preferred language is {language}. You MUST provide the 'disease_name', 'treatment_recommendation', and 'prevention' in {language}.\n"
             else:
-                prompt += "\nLANGUAGE INSTRUCTIONS:\nYou MUST provide the content of all text fields in the SAME language as the farmer's description. If not provided or unclear, default to English.\n"
+                prompt += "\nLANGUAGE INSTRUCTIONS:\nYou MUST provide the 'disease_name' and 'treatment_recommendation' in the SAME language as the farmer's description. If not provided or unclear, default to English.\n"
 
             prompt += """\nProvide your response as a valid JSON object with these EXACT keys:
 - disease_name: The name of the disease or pest identified.
 - confidence_score: A float between 0 and 1 representing your confidence.
 - severity: 'Low', 'Medium', or 'High'.
-- organic_treatment: An object with keys 'name', 'cost' (estimated in INR), and 'instructions'.
-- chemical_treatment: An object with keys 'name', 'cost' (estimated in INR), and 'instructions'.
+- treatment_recommendation: Detailed instructions scaled for {acreage} acres on {soil_type}.
 - prevention: A list of preventive steps specific to {soil_type} constraints.
 - recovery_time: Estimated days to recovery.
-- cost_benefit_analysis: An object with keys 'treatment_cost' (string), 'expected_crop_value_saved' (string), and 'roi' (string).
 
 CRITICAL PRECISION:
 - All chemical or organic quantities MUST be calculated and stated for a {acreage} acre plot.
@@ -69,14 +67,14 @@ CRITICAL PRECISION:
             
             logger.debug(f"Calling Gemini with prompt: {prompt[:500]}...")
             
+            import json
             # Use base64 for more reliable data transfer in some SDK versions
             image_part = {
                 "mime_type": "image/jpeg",
                 "data": image_data
             }
             
-            # Using Gemini 3.0 Flash for Hackathon MVP
-            response = self.model_30_flash.generate_content(
+            response = self.model_15_flash.generate_content(
                 [prompt, image_part],
                 generation_config={"response_mime_type": "application/json"}
             )
@@ -86,10 +84,10 @@ CRITICAL PRECISION:
             return {
                 "status": "success",
                 "analysis": analysis_data,
-                "model_used": "gemini-3.0-flash"
+                "model_used": "gemini-1.5-flash"
             }
         except Exception as e:
-            logger.error(f"3.0 Flash analysis failed: {str(e)}")
+            logger.error(f"1.5 Flash analysis failed: {str(e)}")
             return {"status": "error", "error": str(e)}
 
     # =========================================================================
@@ -236,17 +234,15 @@ Weather Forecast (7 days): {weather_forecast}
             prompt += f"""
 Using the above data, predict the following:
 1. expected_yield: Estimated yield in quintals per acre (float).
-2. yield_range: An object with 'min' and 'max' values (float).
-3. confidence: Your confidence score from 0 to 100 (float).
-4. factors: A list of the top 3-5 factors influencing this prediction ({target_lang_instruction}).
-5. factor_breakdown: An object with keys 'baseline_yield', 'weather_impact', 'treatment_impact', and 'climate_change_impact' (strings or floats with units).
-6. recommendations: A list of 3-5 specific actions the farmer should take ({target_lang_instruction}).
-7. daily_forecast: A list of 7 objects (one for each day in weather_forecast) containing:
+2. confidence: Your confidence score from 0 to 100 (float).
+3. factors: A list of the top 3-5 factors influencing this prediction ({target_lang_instruction}).
+4. recommendations: A list of 3-5 specific actions the farmer should take ({target_lang_instruction}).
+5. daily_forecast: A list of 7 objects (one for each day in weather_forecast) containing:
    - day: Short name (e.g., 'Mon').
    - temp: The forecast max temperature for that day.
    - condition: Brief status (e.g., 'Sunny', 'Heavy Rain').
    - yield_potential: A score (0-100) representing how favorable these specific daily conditions are for {crop_data.get('crop_name', 'the crop')}.
-8. contextual_insights: A list of exactly 4 objects for the following categories: 'Temperature', 'Soil Moisture', 'Disease Risk', 'Sunlight'. Each object MUST have:
+6. contextual_insights: A list of exactly 4 objects for the following categories: 'Temperature', 'Soil Moisture', 'Disease Risk', 'Sunlight'. Each object MUST have:
    - label: The category name IN ENGLISH (e.g., 'Temperature').
    - value: A specific value (e.g., '23.9°C', 'High', 'Moderate', 'Diffuse').
    - status: One of 'Optimal', 'Monitor', 'Warning', 'Good' (IN ENGLISH).
@@ -280,89 +276,6 @@ Return your response as a valid JSON object.
             }
         except Exception as e:
             logger.error(f"3.0 Pro yield prediction failed: {str(e)}")
-            return {"status": "error", "error": str(e)}
-
-    # =========================================================================
-    # SMART FERTILIZER & SUSTAINABILITY (New Features)
-    # =========================================================================
-    async def advise_fertilizer(
-        self,
-        crop_data: Dict[str, Any],
-        soil_type: str,
-        weather_context: Optional[Dict[str, Any]] = None,
-        language: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """Advise on fertilizer using Gemini 3.0 Flash"""
-        try:
-            prompt = f"""You are an expert agricultural advisor.
-Provide fertilizer recommendations for:
-- Crop: {crop_data.get('crop_name')}
-- Stage: {crop_data.get('growth_stage', 'Unknown')}
-- Soil: {soil_type}
-
-Context:
-- Weather: {weather_context}
-"""
-            if language:
-                prompt += f"\nLANGUAGE INSTRUCTIONS:\nThe farmer's preferred language is {language}. You MUST provide the content of 'recommendations' and 'alternatives' in {language}.\n"
-
-            prompt += """
-Provide your response as a valid JSON object with these EXACT keys:
-- recommendations: A list of primary fertilizer recommendations (type, quantity per acre, timing).
-- alternatives: A list of 2-3 alternatives (Organic, Chemical, Mixed) with cost estimates.
-- application_schedule: A brief schedule (daily/weekly).
-- cost_benefit: An object with keys 'cost', 'expected_yield_increase', 'roi'.
-"""
-            response = self.model_30_flash.generate_content(
-                prompt,
-                generation_config={"response_mime_type": "application/json"}
-            )
-            return {
-                "status": "success",
-                "advice": self._parse_json(response.text),
-                "model_used": "gemini-3.0-flash"
-            }
-        except Exception as e:
-            logger.error(f"Fertilizer advice failed: {str(e)}")
-            return {"status": "error", "error": str(e)}
-
-    async def guide_sustainability(
-        self,
-        crop_name: str,
-        current_practices: str,
-        climate_zone: str = "Unknown",
-        language: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """Provide sustainable farming guidance using Gemini 3.0 Flash"""
-        try:
-            prompt = f"""You are an expert in sustainable agriculture.
-Provide guidance for:
-- Crop: {crop_name}
-- Current Practices: {current_practices}
-- Climate Zone: {climate_zone}
-"""
-            if language:
-                prompt += f"\nLANGUAGE INSTRUCTIONS:\nThe farmer's preferred language is {language}. You MUST provide the content in {language}.\n"
-
-            prompt += """
-Provide your response as a valid JSON object with these EXACT keys:
-- organic_alternatives: List of organic alternatives to chemicals.
-- water_conservation: Tips for water conservation.
-- biodiversity: Tips for improving biodiversity.
-- implementation_steps: Step-by-step guide to transition.
-- benefits: Environmental and economic benefits.
-"""
-            response = self.model_30_flash.generate_content(
-                prompt,
-                generation_config={"response_mime_type": "application/json"}
-            )
-            return {
-                "status": "success",
-                "guidance": self._parse_json(response.text),
-                "model_used": "gemini-3.0-flash"
-            }
-        except Exception as e:
-            logger.error(f"Sustainability guidance failed: {str(e)}")
             return {"status": "error", "error": str(e)}
 
     # =========================================================================
